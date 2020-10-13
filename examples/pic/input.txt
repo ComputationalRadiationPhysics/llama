@@ -1,7 +1,7 @@
 NSTEPS=2000
 outputInterval=10
-X=100
-Y=100
+X=1000
+Y=1000
 ppc=10
 R=5
 L=20

@@ -4,100 +4,94 @@
  *  Created on: Aug 20, 2020
  *      Author: Jiri Vyskocil
  */
-
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#define _USE_MATH_DEFINES
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iostream>
-#include <numbers>
+#include <llama/llama.hpp>
 #include <random>
+#include <sstream>
 #include <vector>
 
 using Real = double;
 
-/* Vector types shorthands */
-using V3Real = Eigen::Matrix<Real, 3, 1>;
-using V3Unsigned = Eigen::Matrix<unsigned int, 3, 1>;
-using V3Int = Eigen::Matrix<int, 3, 1>;
+// clang-format off
+struct X{};
+struct Y{};
+struct Z{};
 
-/* Grid types shorthand */
-using VectorField1D = std::vector<V3Real>;
-using VectorField2D = std::vector<VectorField1D>;
-using VectorField3D = std::vector<VectorField2D>;
+using V3Real = llama::Record<
+    llama::Field<X, Real>,
+    llama::Field<Y, Real>,
+    llama::Field<Z, Real>
+>;
 
-/* Basic functions shorthands */
-template<typename T>
-inline T sqr(T x)
+struct R{};
+struct U{};
+struct Q{};
+struct M{};
+
+using Particle = llama::Record<
+    llama::Field<R, V3Real>,
+    llama::Field<U, V3Real>,
+    llama::Field<Q, Real>,
+    llama::Field<M, Real>
+>;
+// clang-format on
+
+const Real PI = M_PI;
+
+auto makeV3Real(Real x, Real y, Real z)
 {
-    return x * x;
+    llama::One<V3Real> r;
+    r(X{}) = x;
+    r(Y{}) = y;
+    r(Z{}) = z;
+    return r;
 }
-
-template<typename T>
-inline T cub(T x)
-{
-    return x * x * x;
-}
-
-const Real PI = std::numbers::pi;
 
 /* Grid operators */
-V3Real rot(const VectorField2D& field, size_t i, size_t j, Real inv_dx, int direction)
+template<typename FieldView>
+auto rot(const FieldView& field, size_t i, size_t j, Real inv_dx, int direction)
 {
-    const int ii = i + direction;
-    const int jj = j + direction;
+    const size_t ii = i + direction;
+    const size_t jj = j + direction;
 
-    return V3Real(
-        (field[i][j].z() - field[i][jj].z()) * inv_dx,
-
-        (field[ii][j].z() - field[i][j].z()) * inv_dx,
-
-        (field[i][j].y() - field[ii][j].y()) * inv_dx - (field[i][j].x() - field[i][jj].x()) * inv_dx);
+    return makeV3Real(
+        (field(i, j)(Z{}) - field(i, jj)(Z{})) * inv_dx,
+        (field(ii, j)(Z{}) - field(i, j)(Z{})) * inv_dx,
+        (field(i, j)(Y{}) - field(ii, j)(Y{})) * inv_dx - (field(i, j)(X{}) - field(i, jj)(X{})) * inv_dx);
 }
 
-struct Particle
-{
-    V3Real r;
-    V3Real u;
-    Real q;
-    Real m;
-};
-using ParticlePool = std::vector<Particle>;
-
-VectorField2D E;
-VectorField2D B;
-VectorField2D J;
-ParticlePool particles;
-
 Real inv_dx;
-int X = 100;
-int Y = 150;
+size_t X_ = 100;
+size_t Y_ = 150;
 Real dx = 0.01;
 Real dt = dx / sqrt(2);
 int ppc = 5;
-int R = 5;
+int R_ = 5;
 int L = 40;
 Real density = 1;
-V3Real B0 = 1e6 * V3Real(1, 0.5, 0.1);
+auto B0 = 1e6 * makeV3Real(1, 0.5, 0.1);
 Real v_drift = 0.01;
 Real v_therm = 0.01;
 Real alpha = PI / 4;
 int NSTEPS = 400;
 int outputInterval = 20;
-V3Real Rc = V3Real(R * dx, R* dx, 0);
+auto Rc = makeV3Real(R_ * dx, R_* dx, 0);
 
 void read_input_file()
 {
-    std::string line;
-    std::ifstream infile("input.txt");
-    if(infile)
+    if(auto infile = std::ifstream("input.txt"))
     {
         double B0x = 0;
         double B0y = 0;
         double B0z = 0;
         double R0x = 0;
         double R0y = 0;
+        std::string line;
         while(infile.good())
         {
             std::getline(infile, line);
@@ -107,13 +101,13 @@ void read_input_file()
             std::getline(stream, name, '=');
             std::getline(stream, value, '=');
             if(name == "X")
-                sscanf(value.c_str(), "%d", &X);
+                sscanf(value.c_str(), "%zu", &X_);
             else if(name == "Y")
-                sscanf(value.c_str(), "%d", &Y);
+                sscanf(value.c_str(), "%zu", &Y_);
             else if(name == "ppc")
                 sscanf(value.c_str(), "%d", &ppc);
             else if(name == "R")
-                sscanf(value.c_str(), "%d", &R);
+                sscanf(value.c_str(), "%d", &R_);
             else if(name == "L")
                 sscanf(value.c_str(), "%d", &L);
             else if(name == "NSTEPS")
@@ -141,24 +135,27 @@ void read_input_file()
             else if(name == "density")
                 sscanf(value.c_str(), "%lf", &density);
         }
-        B0 = V3Real(B0x, B0y, B0z);
-        Rc = V3Real(R * dx + R0x, R * dx + R0y, 0);
+        B0 = makeV3Real(B0x, B0y, B0z);
+        Rc = makeV3Real(R_ * dx + R0x, R_ * dx + R0y, 0);
+        std::cout << "--- input file processed ---" << '\n';
     }
-    std::cout << "X = " << X << '\n'
-              << "Y = " << Y << '\n'
+    else
+        std::cout << "--- no input file found ---" << '\n';
+
+    std::cout << "X = " << X_ << '\n'
+              << "Y = " << Y_ << '\n'
               << "NSTEPS = " << NSTEPS << '\n'
               << "outputInterval = " << outputInterval << '\n'
               << "dx = " << dx << '\n'
               << "ppc = " << ppc << '\n'
-              << "R = " << R << '\n'
+              << "R = " << R_ << '\n'
               << "L = " << L << '\n'
-              << "B0 = " << B0.transpose() << '\n'
+              << "B0 = " << B0(X{}) << " " << B0(Y{}) << " " << B0(Z{}) << '\n'
               << "v_drift = " << v_drift << '\n'
               << "v_therm = " << v_therm << '\n'
               << "alpha = " << alpha << '\n'
               << "density = " << density << '\n'
-              << "Rc = " << Rc.transpose() << '\n'
-              << "--- input file processed ---" << '\n';
+              << "Rc = " << Rc(X{}) << " " << Rc(Y{}) << " " << Rc(Z{}) << '\n';
 }
 
 float swapBytes(float t)
@@ -170,34 +167,36 @@ float swapBytes(float t)
     return t;
 }
 
+template<typename VectorField2D>
 void output(int n, const std::string& name, const VectorField2D& field)
 {
     std::ofstream f("out-" + name + "-" + std::to_string(n) + ".vtk", std::ios::binary);
 
     f << "# vtk DataFile Version 3.0\nvtkfile\n"
       << "BINARY\nDATASET STRUCTURED_POINTS\n"
-      << "DIMENSIONS 1 " << Y << " " << X << "\n"
+      << "DIMENSIONS 1 " << Y_ << " " << X_ << "\n"
       << "ORIGIN 0 0 0\n"
       << "SPACING " << dx << " " << dx << " " << dx << "\n"
-      << "POINT_DATA " << X * Y << "\n"
+      << "POINT_DATA " << X_ * Y_ << "\n"
       << "VECTORS " << name << " float\n";
 
     std::vector<float> buffer;
-    buffer.reserve(X * Y * 3);
-    for(int i = 0; i < X; i++)
+    buffer.reserve(X_ * Y_ * 3);
+    for(size_t i = 0; i < X_; i++)
     {
-        for(int j = 0; j < Y; j++)
+        for(size_t j = 0; j < Y_; j++)
         {
-            const auto& v = field[i][j];
-            buffer.push_back(swapBytes(v.x()));
-            buffer.push_back(swapBytes(v.y()));
-            buffer.push_back(swapBytes(v.z()));
+            const auto& v = field(i, j);
+            buffer.push_back(swapBytes(v(X{})));
+            buffer.push_back(swapBytes(v(Y{})));
+            buffer.push_back(swapBytes(v(Z{})));
         }
     }
     f.write(reinterpret_cast<char*>(buffer.data()), buffer.size() * sizeof(float));
 }
 
-void output(int n, const ParticlePool& particles)
+template<typename ParticleView>
+void output(int n, const ParticleView& particles)
 {
     std::ofstream outP("out-particles-" + std::to_string(n) + ".vtk", std::ios::binary);
     outP << "# vtk DataFile Version 3.0\nvtkfile\nBINARY\nDATASET POLYDATA\n";
@@ -206,44 +205,43 @@ void output(int n, const ParticlePool& particles)
     auto flushBuffer = [&] { outP.write(reinterpret_cast<char*>(buffer.data()), buffer.size() * sizeof(float)); };
     auto addFloat = [&](float f) { buffer.push_back(swapBytes(f)); };
 
-    outP << "POINTS " << particles.size() << " float\n";
-    buffer.reserve(particles.size() * 3);
-    for(const auto& p : particles)
+    const auto pointCount = particles.mapping.arrayDims()[0];
+    outP << "POINTS " << pointCount << " float\n";
+    buffer.reserve(pointCount * 3);
+    for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
     {
+        auto p = particles(i);
         addFloat(0);
-        addFloat(p.r.y());
-        addFloat(p.r.x());
+        addFloat(p(U{}, Y{}));
+        addFloat(p(U{}, X{}));
     }
     flushBuffer();
 
-    outP << "POINT_DATA " << particles.size() << "\nVECTORS velocity float\n";
+    outP << "POINT_DATA " << pointCount << "\nVECTORS velocity float\n";
     buffer.clear();
-    for(const auto& p : particles)
+    for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
     {
-        addFloat(p.u.z());
-        addFloat(p.u.y());
-        addFloat(p.u.x());
+        auto p = particles(i);
+        addFloat(p(U{}, Z{}));
+        addFloat(p(U{}, Y{}));
+        addFloat(p(U{}, X{}));
     }
     flushBuffer();
 
     outP << "SCALARS q float 1\nLOOKUP_TABLE default\n";
     buffer.clear();
-    for(const auto& p : particles)
-    {
-        addFloat(p.q);
-    }
+    for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
+        addFloat(particles(i)(Q{}));
     flushBuffer();
 
     outP << "SCALARS m float 1\nLOOKUP_TABLE default\n";
     buffer.clear();
-    for(const auto& p : particles)
-    {
-        addFloat(p.m);
-    }
+    for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
+        addFloat(particles(i)(M{}));
     flushBuffer();
 }
 
-void setup()
+auto setup()
 {
     read_input_file();
 
@@ -252,16 +250,29 @@ void setup()
 
     std::cout << "dt = " << dt << '\n';
 
-    E = VectorField2D(X, VectorField1D(Y, V3Real(0, 0, 0)));
-    B = VectorField2D(X, VectorField1D(Y, B0));
-    J = VectorField2D(X, VectorField1D(Y, V3Real(0, 0, 0)));
-    particles = {};
+    auto fieldAd = llama::ArrayDims{X_, Y_};
+    auto fieldMapping = llama::mapping::AoS<decltype(fieldAd), V3Real>(fieldAd);
 
-    const Real r = R * dx;
+    // TODO: how about a llama::forEach that passes an auto& to each leave node instead of the coord?
+    auto E = llama::allocView(fieldMapping);
+    auto B = llama::allocView(fieldMapping);
+    auto J = llama::allocView(fieldMapping);
+    for(auto i : llama::ArrayDimsIndexRange{fieldAd})
+    {
+        E(i) = 0;
+        B(i) = B0;
+        J(i) = 0;
+    }
+
+    const Real r = R_ * dx;
     const Real l = L * dx;
 
-    const size_t numpart = 2 * ppc * R * L;
-    particles.reserve(numpart);
+    const size_t numpart = 2 * ppc * R_ * L;
+
+    auto particleAd = llama::ArrayDims{numpart};
+    auto particleMapping = llama::mapping::SoA<decltype(particleAd), Particle>{particleAd};
+
+    auto particles = llama::allocView(particleMapping);
 
     std::default_random_engine engine;
 
@@ -270,143 +281,159 @@ void setup()
 
     /* Beam initialization. Plasma must be neutral in each cell, so let's just
      * create an electron and a proton at the same spot. (I know...) */
-    for(int i = 0; i < numpart; i += 2)
+    for(size_t i = 0; i < numpart; i += 2)
     {
         const Real rp = 2 * r * (uniform() - 0.5);
         const Real lp = l * uniform();
-        const V3Real r = Rc + V3Real(lp * sin(alpha) + rp * cos(alpha), lp * cos(alpha) - rp * sin(alpha), 0)
-            + dx * V3Real(1, 1, 0); // ghost cell
-        const V3Real u = V3Real(v_drift * sin(alpha), v_drift * cos(alpha), 0);
+        const auto r = Rc + makeV3Real(lp * sin(alpha) + rp * cos(alpha), lp * cos(alpha) - rp * sin(alpha), 0)
+            + dx * makeV3Real(1, 1, 0); // ghost cell
+        const auto u = makeV3Real(v_drift * sin(alpha), v_drift * cos(alpha), 0);
 
         /* Electron */
-        auto& p = particles.emplace_back();
-        p.q = -1;
-        p.m = 1;
-        p.r = r;
-        p.u = u + v_therm * V3Real(gauss(), gauss(), gauss());
-        ;
+        auto p = particles(i);
+        p(Q{}) = -1;
+        p(M{}) = 1;
+        p(R{}) = r;
+        p(U{}) = u + v_therm * makeV3Real(gauss(), gauss(), gauss());
 
         /* Proton */
-        auto& p2 = particles.emplace_back();
-        p2.q = 1;
-        p2.m = 1386;
-        p2.r = r;
-        p2.u = u + v_therm * V3Real(gauss(), gauss(), gauss());
+        auto p2 = particles(i + 1);
+        p2(Q{}) = 1;
+        p2(M{}) = 1386;
+        p2(R{}) = r;
+        p2(U{}) = u + v_therm * makeV3Real(gauss(), gauss(), gauss());
     }
 
-    std::cout << "Initialized " << particles.size() << " particles\n";
+    std::cout << "Initialized " << numpart << " particles\n";
+
+    return std::tuple{E, B, J, particles};
 }
 
-void advance_particle(Particle& part, const VectorField2D& E, const VectorField2D& B)
+template<typename Vec3F>
+auto squaredNorm(const Vec3F& vec) -> Real
+{
+    return vec(X{}) * vec(X{}) + vec(Y{}) * vec(Y{}) + vec(Z{}) * vec(Z{});
+}
+
+template<typename Vec3F>
+auto cross(const Vec3F& a, const Vec3F& b)
+{
+    return makeV3Real(
+        a(Y{}) * b(Z{}) - a(Z{}) * b(Y{}),
+        a(Z{}) * b(Z{}) - a(Z{}) * b(Z{}),
+        a(Z{}) * b(Y{}) - a(Y{}) * b(Z{}));
+}
+
+template<typename VirtualParticle, typename FieldView>
+void advance_particle(VirtualParticle part, const FieldView& E, const FieldView& B)
 {
     /* Interpolate fields (nearest-neighbor) */
     /*FIXME: These are wrong. Even NGP interpolation must respect staggering! */
-    const auto i = static_cast<size_t>(part.r.x() * inv_dx);
-    const auto j = static_cast<size_t>(part.r.y() * inv_dx);
-    const V3Real El = E[i][j];
-    const V3Real Bl = B[i][j];
+    const auto i = static_cast<size_t>(part(R{}, X{}) * inv_dx);
+    const auto j = static_cast<size_t>(part(R{}, Y{}) * inv_dx);
+    const auto El = E(i, j);
+    const auto Bl = B(i, j);
 
     /* q/m [SI] -> 2*PI*q/m in dimensionless */
-    const Real qmpidt = part.q / part.m * PI * dt;
-    const Real igamma = 1 / sqrt(1 + part.u.squaredNorm());
+    const Real qmpidt = part(Q{}) / part(M{}) * PI * dt;
+    const Real igamma = 1 / sqrt(1 + squaredNorm(part(U{})));
 
-    const V3Real F_E = qmpidt * El;
-    const V3Real F_B = igamma * qmpidt * Bl;
+    const auto F_E = qmpidt * El;
+    const auto F_B = igamma * qmpidt * Bl;
 
     /* Buneman-Boris scheme */
-    const V3Real u_m = part.u + F_E;
-    const V3Real u_0 = u_m + u_m.cross(F_B);
-    const V3Real u_p = u_m + 2 / (1 + F_B.squaredNorm()) * (u_0.cross(F_B));
-    const V3Real u = u_p + F_E;
+    const auto u_m = part(U{}) + F_E;
+    const auto u_0 = u_m + cross(u_m, F_B);
+    const auto u_p = u_m + 2 / (1 + squaredNorm(F_B)) * cross(u_0, F_B);
+    const auto u = u_p + F_E;
 
     /* Update stored velocity and advance particle */
-    const Real igamma2 = 1 / sqrt(1 + part.u.squaredNorm());
-    part.u = u;
-    part.r += dt * igamma2 * u;
-    part.r.z() = 0;
+    const Real igamma2 = 1 / sqrt(1 + squaredNorm(part(U{})));
+    part(U{}) = u;
+    part(R{}) += dt * igamma2 * u;
+    part(R{}, Z{}) = 0;
 }
 
-void particle_boundary_conditions(ParticlePool& particles)
+template<typename ParticleView>
+void particle_boundary_conditions(ParticleView& particles)
 { //* Periodic boundary condition
-    for(auto& p : particles)
+    for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
     {
-        if(p.r.x() < dx)
-        {
-            p.r.x() += (X - 2) * dx;
-        }
-        else if(p.r.x() > (X - 1) * dx)
-        {
-            p.r.x() -= (X - 2) * dx;
-        }
-        if(p.r.y() < dx)
-        {
-            p.r.y() += (Y - 2) * dx;
-        }
-        else if(p.r.y() > (Y - 1) * dx)
-        {
-            p.r.y() -= (Y - 2) * dx;
-        }
+        auto p = particles(i);
+        if(p(R{}, X{}) < dx)
+            p(R{}, X{}) += (X_ - 2) * dx;
+        else if(p(R{}, X{}) > (X_ - 1) * dx)
+            p(R{}, X{}) -= (X_ - 2) * dx;
+        if(p(R{}, Y{}) < dx)
+            p(R{}, Y{}) += (Y_ - 2) * dx;
+        else if(p(R{}, Y{}) > (Y_ - 1) * dx)
+            p(R{}, Y{}) -= (Y_ - 2) * dx;
     }
 }
 
-void deposit_current(const Particle& part, VectorField2D& J)
+template<typename VirtualParticle, typename FieldView>
+void deposit_current(const VirtualParticle& part, FieldView& J)
 {
     /* Calculation of previous position */
-    const Real igamma = 1 / sqrt(1 + part.u.squaredNorm());
-    const V3Real r_old = part.r - igamma * dt * part.u; // Position should be a 2D vector
+    const Real igamma = 1 / sqrt(1 + squaredNorm(part(U{})));
+    const auto r_old = part(R{}) - igamma * dt * part(U{}); // Position should be a 2D vector
 
     /* Particle position to cell coordinates */
-    const int i = static_cast<size_t>(part.r[0] * inv_dx);
-    const int j = static_cast<size_t>(part.r[1] * inv_dx);
+    const auto i = static_cast<size_t>(part(R{}, X{}) * inv_dx);
+    const auto j = static_cast<size_t>(part(R{}, Y{}) * inv_dx);
 
-    const int i_old = static_cast<size_t>(r_old[0] * inv_dx);
-    const int j_old = static_cast<size_t>(r_old[1] * inv_dx);
+    const auto i_old = static_cast<size_t>(r_old(X{}) * inv_dx);
+    const auto j_old = static_cast<size_t>(r_old(Y{}) * inv_dx);
 
     /* Current density deposition */
-    const V3Real F = density * part.q * igamma * part.u;
+    const auto F = density * part(Q{}) * igamma * part(U{});
 
     /*FIXME: J is defined mid-edge, so this is not NGP.*/
-    J[i_old][j_old] -= F;
-    J[i][j] += F;
+    J(i_old, j_old) -= F;
+    J(i, j) += F;
 }
 
-void current_boundary_condition(VectorField2D& J)
+template<typename FieldView>
+void current_boundary_condition(FieldView& J)
 {
-    for(size_t i = 0; i < X; ++i)
+    for(size_t i = 0; i < X_; ++i)
     {
-        J[i][Y - 2] += J[i][0];
-        J[i][1] += J[i][Y - 1];
+        J(i, Y_ - 2) += J(i, size_t{0});
+        J(i, size_t{1}) += J(i, Y_ - 1);
     }
-    for(size_t j = 1; j < Y - 1; j++)
+    for(size_t j = 1; j < Y_ - 1; j++)
     {
-        J[X - 2][j] += J[0][j];
-        J[1][j] += J[X - 1][j];
+        J(X_ - 2, j) += J(size_t{0}, j);
+        J(size_t{1}, j) += J(X_ - 1, j);
     }
 }
 
 /* Half-step in B */
-void advance_B_half(const VectorField2D& E, VectorField2D& B, size_t i, size_t j)
+template<typename FieldView>
+void advance_B_half(const FieldView& E, FieldView& B, size_t i, size_t j)
 {
-    B[i][j] += 0.5 * dt * rot(E, i, j, inv_dx, 1);
+    B(i, j) += 0.5 * dt * rot(E, i, j, inv_dx, 1);
 }
 
 /* Full step in E */
-void advance_E(VectorField2D& E, const VectorField2D& B, const VectorField2D& J, size_t i, size_t j)
+template<typename FieldView>
+void advance_E(FieldView& E, const FieldView& B, const FieldView& J, size_t i, size_t j)
 {
-    E[i][j] += dt * rot(B, i, j, inv_dx, -1) - 2 * PI * dt * J[i][j]; // full step i n E
+    E(i, j) += dt * rot(B, i, j, inv_dx, -1) - 2 * PI * dt * J(i, j); // full step i n E
 }
 
-void field_boundary_condition(VectorField2D& field)
+template<typename FieldView>
+void field_boundary_condition(FieldView& field)
 {
-    for(size_t i = 0; i < X; ++i)
+    for(size_t i = 0; i < X_; ++i)
     {
-        field[i][0] = field[i][Y - 2];
-        field[i][Y - 1] = field[i][1];
+        field(i, size_t{0}) = field(i, Y_ - 2);
+        field(i, Y_ - 1) = field(i, size_t{1});
     }
-    for(size_t j = 1; j < Y - 1; j++)
+    for(size_t j = 1; j < Y_ - 1; j++)
     {
-        field[0][j] = field[X - 2][j];
-        field[X - 1][j] = field[1][j];
+        field(size_t{0}, j) = field(X_ - 2, j);
+        field(X_ - 1, j) = field(size_t{1}, j);
     }
 }
 
@@ -414,7 +441,7 @@ constexpr auto reportInterval = 10;
 
 int main()
 {
-    setup();
+    auto [E, B, J, particles] = setup();
 
     std::cout << "Running N = " << NSTEPS << " steps\n";
     /* Timestep */
@@ -423,9 +450,7 @@ int main()
     for(int n = 0; n <= NSTEPS; n++)
     {
         if(n % reportInterval != 0)
-        {
             std::cout << "." << std::flush;
-        }
         else if(n > 0)
         {
             std::cout << " " << n << " iterations, "
@@ -437,54 +462,35 @@ int main()
         auto start = clock::now();
 
         /* Clear charge/current density fields */
-        for(int i = 0; i < X; i++)
-        {
-            for(int j = 0; j < Y; j++)
-            {
-                J[i][j] = V3Real(0, 0, 0);
-            }
-        }
+        for(size_t i = 0; i < X_; i++)
+            for(size_t j = 0; j < Y_; j++)
+                J(i, j) = makeV3Real(0, 0, 0);
 
         /* Integrate equations of motion */
-        for(auto& particle : particles)
-        {
-            advance_particle(particle, E, B);
-        }
+        for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
+            advance_particle(particles(i), E, B);
         particle_boundary_conditions(particles);
 
         /* Deposit charge/current density */
-        for(auto& particle : particles)
-        {
-            deposit_current(particle, J);
-        }
+        for(auto i : llama::ArrayDimsIndexRange{particles.mapping.arrayDims()})
+            deposit_current(particles(i), J);
         current_boundary_condition(J);
 
         /* Integrate Maxwell's equations */
-        for(int i = 1; i < X - 1; i++)
-        { // This could be a view or something
-            for(int j = 1; j < Y - 1; j++)
-            {
+        // This could be a view or something
+        for(size_t i = 1; i < X_ - 1; i++)
+            for(size_t j = 1; j < Y_ - 1; j++)
                 advance_B_half(E, B, i, j);
-            }
-        }
         field_boundary_condition(B); // This could be a view as well
 
-        for(int i = 1; i < X - 1; i++)
-        {
-            for(int j = 1; j < Y - 1; j++)
-            {
+        for(size_t i = 1; i < X_ - 1; i++)
+            for(size_t j = 1; j < Y_ - 1; j++)
                 advance_E(E, B, J, i, j);
-            }
-        }
         field_boundary_condition(E);
 
-        for(int i = 1; i < X - 1; i++)
-        {
-            for(int j = 1; j < Y - 1; j++)
-            {
+        for(size_t i = 1; i < X_ - 1; i++)
+            for(size_t j = 1; j < Y_ - 1; j++)
                 advance_B_half(E, B, i, j);
-            }
-        }
         field_boundary_condition(B);
 
         timeAcc += clock::now() - start;
