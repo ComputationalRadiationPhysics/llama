@@ -5,16 +5,15 @@
  *      Author: Jiri Vyskocil
  */
 
-#include <iostream>
-#include <fstream>
-#include <cmath>
-#include <vector>
-#include <random>
-#include <chrono>
-#include <numbers>
-
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <chrono>
+#include <cmath>
+#include <fstream>
+#include <iostream>
+#include <numbers>
+#include <random>
+#include <vector>
 
 using Real = double;
 
@@ -29,12 +28,23 @@ using VectorField2D = std::vector<VectorField1D>;
 using VectorField3D = std::vector<VectorField2D>;
 
 /* Basic functions shorthands */
-template<typename T> inline T sqr(T x) { return x * x; }
-template<typename T> inline T cub(T x) { return x * x * x; }
+template<typename T>
+inline T sqr(T x)
+{
+    return x * x;
+}
+
+template<typename T>
+inline T cub(T x)
+{
+    return x * x * x;
+}
+
 const Real PI = std::numbers::pi;
 
 /* Grid operators */
-V3Real rot(const VectorField2D& field, size_t i, size_t j, Real inv_dx, int direction) {
+V3Real rot(const VectorField2D& field, size_t i, size_t j, Real inv_dx, int direction)
+{
     const int ii = i + direction;
     const int jj = j + direction;
 
@@ -43,12 +53,11 @@ V3Real rot(const VectorField2D& field, size_t i, size_t j, Real inv_dx, int dire
 
         (field[ii][j].z() - field[i][j].z()) * inv_dx,
 
-        (field[i][j].y() - field[ii][j].y()) * inv_dx
-        - (field[i][j].x() - field[i][jj].x()) * inv_dx
-    );
+        (field[i][j].y() - field[ii][j].y()) * inv_dx - (field[i][j].x() - field[i][jj].x()) * inv_dx);
 }
 
-struct Particle {
+struct Particle
+{
     V3Real r;
     V3Real u;
     Real q;
@@ -76,88 +85,109 @@ Real v_therm = 0.01;
 Real alpha = PI / 4;
 int NSTEPS = 400;
 int outputInterval = 20;
-V3Real Rc = V3Real(R * dx, R * dx, 0);
+V3Real Rc = V3Real(R * dx, R* dx, 0);
 
-void read_input_file() {
+void read_input_file()
+{
     std::string line;
     std::ifstream infile("input.txt");
-    if (infile) {
+    if(infile)
+    {
         double B0x = 0;
         double B0y = 0;
         double B0z = 0;
         double R0x = 0;
         double R0y = 0;
-        while (infile.good()) {
+        while(infile.good())
+        {
             std::getline(infile, line);
             std::string name;
             std::string value;
             std::stringstream stream(line);
             std::getline(stream, name, '=');
             std::getline(stream, value, '=');
-            if (name == "X")                   sscanf(value.c_str(), "%d", &X);
-            else if (name == "Y")              sscanf(value.c_str(), "%d", &Y);
-            else if (name == "ppc")            sscanf(value.c_str(), "%d", &ppc);
-            else if (name == "R")              sscanf(value.c_str(), "%d", &R);
-            else if (name == "L")              sscanf(value.c_str(), "%d", &L);
-            else if (name == "NSTEPS")         sscanf(value.c_str(), "%d", &NSTEPS);
-            else if (name == "outputInterval") sscanf(value.c_str(), "%d", &outputInterval);
-            else if (name == "dx")  	       sscanf(value.c_str(), "%lf", &dx);
-            else if (name == "B0x")            sscanf(value.c_str(), "%lf", &B0x);
-            else if (name == "B0y")            sscanf(value.c_str(), "%lf", &B0y);
-            else if (name == "R0x")            sscanf(value.c_str(), "%lf", &R0x);
-            else if (name == "R0y")            sscanf(value.c_str(), "%lf", &R0y);
-            else if (name == "B0z")            sscanf(value.c_str(), "%lf", &B0z);
-            else if (name == "v_drift")        sscanf(value.c_str(), "%lf", &v_drift);
-            else if (name == "v_therm")        sscanf(value.c_str(), "%lf", &v_therm);
-            else if (name == "alpha")          sscanf(value.c_str(), "%lf", &alpha);
-            else if (name == "density")        sscanf(value.c_str(), "%lf", &density);
+            if(name == "X")
+                sscanf(value.c_str(), "%d", &X);
+            else if(name == "Y")
+                sscanf(value.c_str(), "%d", &Y);
+            else if(name == "ppc")
+                sscanf(value.c_str(), "%d", &ppc);
+            else if(name == "R")
+                sscanf(value.c_str(), "%d", &R);
+            else if(name == "L")
+                sscanf(value.c_str(), "%d", &L);
+            else if(name == "NSTEPS")
+                sscanf(value.c_str(), "%d", &NSTEPS);
+            else if(name == "outputInterval")
+                sscanf(value.c_str(), "%d", &outputInterval);
+            else if(name == "dx")
+                sscanf(value.c_str(), "%lf", &dx);
+            else if(name == "B0x")
+                sscanf(value.c_str(), "%lf", &B0x);
+            else if(name == "B0y")
+                sscanf(value.c_str(), "%lf", &B0y);
+            else if(name == "R0x")
+                sscanf(value.c_str(), "%lf", &R0x);
+            else if(name == "R0y")
+                sscanf(value.c_str(), "%lf", &R0y);
+            else if(name == "B0z")
+                sscanf(value.c_str(), "%lf", &B0z);
+            else if(name == "v_drift")
+                sscanf(value.c_str(), "%lf", &v_drift);
+            else if(name == "v_therm")
+                sscanf(value.c_str(), "%lf", &v_therm);
+            else if(name == "alpha")
+                sscanf(value.c_str(), "%lf", &alpha);
+            else if(name == "density")
+                sscanf(value.c_str(), "%lf", &density);
         }
         B0 = V3Real(B0x, B0y, B0z);
         Rc = V3Real(R * dx + R0x, R * dx + R0y, 0);
     }
     std::cout << "X = " << X << '\n'
-        << "Y = " << Y << '\n'
-        << "NSTEPS = " << NSTEPS << '\n'
-        << "outputInterval = " << outputInterval << '\n'
-        << "dx = " << dx << '\n'
-        << "ppc = " << ppc << '\n'
-        << "R = " << R << '\n'
-        << "L = " << L << '\n'
-        << "B0 = " << B0.transpose() << '\n'
-        << "v_drift = " << v_drift << '\n'
-        << "v_therm = " << v_therm << '\n'
-        << "alpha = " << alpha << '\n'
-        << "density = " << density << '\n'
-        << "Rc = " << Rc.transpose() << '\n'
-        << "--- input file processed ---" << '\n';
+              << "Y = " << Y << '\n'
+              << "NSTEPS = " << NSTEPS << '\n'
+              << "outputInterval = " << outputInterval << '\n'
+              << "dx = " << dx << '\n'
+              << "ppc = " << ppc << '\n'
+              << "R = " << R << '\n'
+              << "L = " << L << '\n'
+              << "B0 = " << B0.transpose() << '\n'
+              << "v_drift = " << v_drift << '\n'
+              << "v_therm = " << v_therm << '\n'
+              << "alpha = " << alpha << '\n'
+              << "density = " << density << '\n'
+              << "Rc = " << Rc.transpose() << '\n'
+              << "--- input file processed ---" << '\n';
 }
 
-float swapBytes(float t) {
+float swapBytes(float t)
+{
     uint32_t a;
     std::memcpy(&a, &t, sizeof(a));
-    a = ((a & 0x000000FF) << 24) |
-        ((a & 0x0000FF00) << 8) |
-        ((a & 0x00FF0000) >> 8) |
-        ((a & 0xFF000000) >> 24);
+    a = ((a & 0x000000FF) << 24) | ((a & 0x0000FF00) << 8) | ((a & 0x00FF0000) >> 8) | ((a & 0xFF000000) >> 24);
     std::memcpy(&t, &a, sizeof(a));
     return t;
 }
 
-void output(int n, const std::string& name, const VectorField2D& field) {
+void output(int n, const std::string& name, const VectorField2D& field)
+{
     std::ofstream f("out-" + name + "-" + std::to_string(n) + ".vtk", std::ios::binary);
 
     f << "# vtk DataFile Version 3.0\nvtkfile\n"
-        << "BINARY\nDATASET STRUCTURED_POINTS\n"
-        << "DIMENSIONS 1 " << Y << " " << X << "\n"
-        << "ORIGIN 0 0 0\n"
-        << "SPACING " << dx << " " << dx << " " << dx << "\n"
-        << "POINT_DATA " << X * Y << "\n"
-        << "VECTORS " << name << " float\n";
+      << "BINARY\nDATASET STRUCTURED_POINTS\n"
+      << "DIMENSIONS 1 " << Y << " " << X << "\n"
+      << "ORIGIN 0 0 0\n"
+      << "SPACING " << dx << " " << dx << " " << dx << "\n"
+      << "POINT_DATA " << X * Y << "\n"
+      << "VECTORS " << name << " float\n";
 
     std::vector<float> buffer;
     buffer.reserve(X * Y * 3);
-    for (int i = 0; i < X; i++) {
-        for (int j = 0; j < Y; j++) {
+    for(int i = 0; i < X; i++)
+    {
+        for(int j = 0; j < Y; j++)
+        {
             const auto& v = field[i][j];
             buffer.push_back(swapBytes(v.x()));
             buffer.push_back(swapBytes(v.y()));
@@ -167,21 +197,19 @@ void output(int n, const std::string& name, const VectorField2D& field) {
     f.write(reinterpret_cast<char*>(buffer.data()), buffer.size() * sizeof(float));
 }
 
-void output(int n, const ParticlePool& particles) {
+void output(int n, const ParticlePool& particles)
+{
     std::ofstream outP("out-particles-" + std::to_string(n) + ".vtk", std::ios::binary);
     outP << "# vtk DataFile Version 3.0\nvtkfile\nBINARY\nDATASET POLYDATA\n";
 
     std::vector<float> buffer;
-    auto flushBuffer = [&] {
-        outP.write(reinterpret_cast<char*>(buffer.data()), buffer.size() * sizeof(float));
-    };
-    auto addFloat = [&](float f) {
-        buffer.push_back(swapBytes(f));
-    };
+    auto flushBuffer = [&] { outP.write(reinterpret_cast<char*>(buffer.data()), buffer.size() * sizeof(float)); };
+    auto addFloat = [&](float f) { buffer.push_back(swapBytes(f)); };
 
     outP << "POINTS " << particles.size() << " float\n";
     buffer.reserve(particles.size() * 3);
-    for (const auto& p : particles) {
+    for(const auto& p : particles)
+    {
         addFloat(0);
         addFloat(p.r.y());
         addFloat(p.r.x());
@@ -190,7 +218,8 @@ void output(int n, const ParticlePool& particles) {
 
     outP << "POINT_DATA " << particles.size() << "\nVECTORS velocity float\n";
     buffer.clear();
-    for (const auto& p : particles) {
+    for(const auto& p : particles)
+    {
         addFloat(p.u.z());
         addFloat(p.u.y());
         addFloat(p.u.x());
@@ -199,20 +228,23 @@ void output(int n, const ParticlePool& particles) {
 
     outP << "SCALARS q float 1\nLOOKUP_TABLE default\n";
     buffer.clear();
-    for (const auto& p : particles) {
+    for(const auto& p : particles)
+    {
         addFloat(p.q);
     }
     flushBuffer();
 
     outP << "SCALARS m float 1\nLOOKUP_TABLE default\n";
     buffer.clear();
-    for (const auto& p : particles) {
+    for(const auto& p : particles)
+    {
         addFloat(p.m);
     }
     flushBuffer();
 }
 
-void setup() {
+void setup()
+{
     read_input_file();
 
     inv_dx = 1 / dx;
@@ -233,20 +265,16 @@ void setup() {
 
     std::default_random_engine engine;
 
-    auto uniform = [&] {
-        return std::uniform_real_distribution<Real>{}(engine);
-    };
-    auto gauss = [&] {
-        return sqrt(-2.0 * log(1.0 - uniform())) * sin(2 * PI * uniform());
-    };
+    auto uniform = [&] { return std::uniform_real_distribution<Real>{}(engine); };
+    auto gauss = [&] { return sqrt(-2.0 * log(1.0 - uniform())) * sin(2 * PI * uniform()); };
 
     /* Beam initialization. Plasma must be neutral in each cell, so let's just
      * create an electron and a proton at the same spot. (I know...) */
-    for (int i = 0; i < numpart; i += 2) {
+    for(int i = 0; i < numpart; i += 2)
+    {
         const Real rp = 2 * r * (uniform() - 0.5);
         const Real lp = l * uniform();
-        const V3Real r = Rc + V3Real(lp * sin(alpha) + rp * cos(alpha),
-            lp * cos(alpha) - rp * sin(alpha), 0)
+        const V3Real r = Rc + V3Real(lp * sin(alpha) + rp * cos(alpha), lp * cos(alpha) - rp * sin(alpha), 0)
             + dx * V3Real(1, 1, 0); // ghost cell
         const V3Real u = V3Real(v_drift * sin(alpha), v_drift * cos(alpha), 0);
 
@@ -255,7 +283,8 @@ void setup() {
         p.q = -1;
         p.m = 1;
         p.r = r;
-        p.u = u + v_therm * V3Real(gauss(), gauss(), gauss());;
+        p.u = u + v_therm * V3Real(gauss(), gauss(), gauss());
+        ;
 
         /* Proton */
         auto& p2 = particles.emplace_back();
@@ -268,7 +297,8 @@ void setup() {
     std::cout << "Initialized " << particles.size() << " particles\n";
 }
 
-void advance_particle(Particle& part, const VectorField2D& E, const VectorField2D& B) {
+void advance_particle(Particle& part, const VectorField2D& E, const VectorField2D& B)
+{
     /* Interpolate fields (nearest-neighbor) */
     /*FIXME: These are wrong. Even NGP interpolation must respect staggering! */
     const auto i = static_cast<size_t>(part.r.x() * inv_dx);
@@ -296,16 +326,31 @@ void advance_particle(Particle& part, const VectorField2D& E, const VectorField2
     part.r.z() = 0;
 }
 
-void particle_boundary_conditions(ParticlePool& particles) {  //* Periodic boundary condition
-    for (auto& p : particles) {
-        if (p.r.x() < dx) { p.r.x() += (X - 2) * dx; }
-        else if (p.r.x() > (X - 1) * dx) { p.r.x() -= (X - 2) * dx; }
-        if (p.r.y() < dx) { p.r.y() += (Y - 2) * dx; }
-        else if (p.r.y() > (Y - 1) * dx) { p.r.y() -= (Y - 2) * dx; }
+void particle_boundary_conditions(ParticlePool& particles)
+{ //* Periodic boundary condition
+    for(auto& p : particles)
+    {
+        if(p.r.x() < dx)
+        {
+            p.r.x() += (X - 2) * dx;
+        }
+        else if(p.r.x() > (X - 1) * dx)
+        {
+            p.r.x() -= (X - 2) * dx;
+        }
+        if(p.r.y() < dx)
+        {
+            p.r.y() += (Y - 2) * dx;
+        }
+        else if(p.r.y() > (Y - 1) * dx)
+        {
+            p.r.y() -= (Y - 2) * dx;
+        }
     }
 }
 
-void deposit_current(const Particle& part, VectorField2D& J) {
+void deposit_current(const Particle& part, VectorField2D& J)
+{
     /* Calculation of previous position */
     const Real igamma = 1 / sqrt(1 + part.u.squaredNorm());
     const V3Real r_old = part.r - igamma * dt * part.u; // Position should be a 2D vector
@@ -325,33 +370,41 @@ void deposit_current(const Particle& part, VectorField2D& J) {
     J[i][j] += F;
 }
 
-void current_boundary_condition(VectorField2D& J) {
-    for (size_t i = 0; i < X; ++i) {
+void current_boundary_condition(VectorField2D& J)
+{
+    for(size_t i = 0; i < X; ++i)
+    {
         J[i][Y - 2] += J[i][0];
         J[i][1] += J[i][Y - 1];
     }
-    for (size_t j = 1; j < Y - 1; j++) {
+    for(size_t j = 1; j < Y - 1; j++)
+    {
         J[X - 2][j] += J[0][j];
         J[1][j] += J[X - 1][j];
     }
 }
 
 /* Half-step in B */
-void advance_B_half(const VectorField2D& E, VectorField2D& B, size_t i, size_t j) {
+void advance_B_half(const VectorField2D& E, VectorField2D& B, size_t i, size_t j)
+{
     B[i][j] += 0.5 * dt * rot(E, i, j, inv_dx, 1);
 }
 
 /* Full step in E */
-void advance_E(VectorField2D& E, const VectorField2D& B, const VectorField2D& J, size_t i, size_t j) {
+void advance_E(VectorField2D& E, const VectorField2D& B, const VectorField2D& J, size_t i, size_t j)
+{
     E[i][j] += dt * rot(B, i, j, inv_dx, -1) - 2 * PI * dt * J[i][j]; // full step i n E
 }
 
-void field_boundary_condition(VectorField2D& field) {
-    for (size_t i = 0; i < X; ++i) {
+void field_boundary_condition(VectorField2D& field)
+{
+    for(size_t i = 0; i < X; ++i)
+    {
         field[i][0] = field[i][Y - 2];
         field[i][Y - 1] = field[i][1];
     }
-    for (size_t j = 1; j < Y - 1; j++) {
+    for(size_t j = 1; j < Y - 1; j++)
+    {
         field[0][j] = field[X - 2][j];
         field[X - 1][j] = field[1][j];
     }
@@ -359,59 +412,76 @@ void field_boundary_condition(VectorField2D& field) {
 
 constexpr auto reportInterval = 10;
 
-int main() {
+int main()
+{
     setup();
 
     std::cout << "Running N = " << NSTEPS << " steps\n";
     /* Timestep */
     using clock = std::chrono::high_resolution_clock;
     clock::duration timeAcc = {};
-    for (int n = 0; n <= NSTEPS; n++) {
-        if (n % reportInterval != 0) {
+    for(int n = 0; n <= NSTEPS; n++)
+    {
+        if(n % reportInterval != 0)
+        {
             std::cout << "." << std::flush;
         }
-        else if (n > 0) {
-            std::cout << " " << n << " iterations, " << std::chrono::duration_cast<std::chrono::milliseconds>(timeAcc).count() / reportInterval << "ms per step\n" << std::flush;
+        else if(n > 0)
+        {
+            std::cout << " " << n << " iterations, "
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(timeAcc).count() / reportInterval
+                      << "ms per step\n"
+                      << std::flush;
             timeAcc = {};
         }
         auto start = clock::now();
 
         /* Clear charge/current density fields */
-        for (int i = 0; i < X; i++) {
-            for (int j = 0; j < Y; j++) {
+        for(int i = 0; i < X; i++)
+        {
+            for(int j = 0; j < Y; j++)
+            {
                 J[i][j] = V3Real(0, 0, 0);
             }
         }
 
         /* Integrate equations of motion */
-        for (auto& particle : particles) {
+        for(auto& particle : particles)
+        {
             advance_particle(particle, E, B);
         }
         particle_boundary_conditions(particles);
 
         /* Deposit charge/current density */
-        for (auto& particle : particles) {
+        for(auto& particle : particles)
+        {
             deposit_current(particle, J);
         }
         current_boundary_condition(J);
 
         /* Integrate Maxwell's equations */
-        for (int i = 1; i < X - 1; i++) {            // This could be a view or something
-            for (int j = 1; j < Y - 1; j++) {
+        for(int i = 1; i < X - 1; i++)
+        { // This could be a view or something
+            for(int j = 1; j < Y - 1; j++)
+            {
                 advance_B_half(E, B, i, j);
             }
         }
-        field_boundary_condition(B);  // This could be a view as well
+        field_boundary_condition(B); // This could be a view as well
 
-        for (int i = 1; i < X - 1; i++) {
-            for (int j = 1; j < Y - 1; j++) {
+        for(int i = 1; i < X - 1; i++)
+        {
+            for(int j = 1; j < Y - 1; j++)
+            {
                 advance_E(E, B, J, i, j);
             }
         }
         field_boundary_condition(E);
 
-        for (int i = 1; i < X - 1; i++) {
-            for (int j = 1; j < Y - 1; j++) {
+        for(int i = 1; i < X - 1; i++)
+        {
+            for(int j = 1; j < Y - 1; j++)
+            {
                 advance_B_half(E, B, i, j);
             }
         }
@@ -420,7 +490,8 @@ int main() {
         timeAcc += clock::now() - start;
 
         /* Output data */
-        if (n % outputInterval == 0) {
+        if(n % outputInterval == 0)
+        {
             output(n, "E", E);
             output(n, "B", B);
             output(n, "J", J);
