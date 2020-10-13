@@ -58,6 +58,7 @@ if (LLAMA_BUILD_EXAMPLES)
 	add_subdirectory("examples/viewcopy")
 	add_subdirectory("examples/bufferguard")
 	add_subdirectory("examples/raycast")
+	add_subdirectory("examples/pic")
 
 	# alpaka examples
 	find_package(alpaka 0.7.0 QUIET)

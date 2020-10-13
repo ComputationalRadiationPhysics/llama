@@ -1,0 +1,17 @@
+NSTEPS=2000
+outputInterval=10
+X=100
+Y=100
+ppc=10
+R=5
+L=20
+dx=0.01
+density=0.2
+B0x=0.0
+B0y=0.0
+B0z=0.0
+v_therm=0.005
+v_drift=0.2
+alpha=0.8
+R0x=0.0
+R0y=0.0
