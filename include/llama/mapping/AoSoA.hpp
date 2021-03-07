@@ -56,8 +56,10 @@ namespace llama::mapping
             return LinearizeArrayDimsFunctor{}.size(arrayDimsSize) * sizeOf<RecordDim>;
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(ArrayDims coord) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(
+            ArrayDims coord,
+            Array<std::size_t, N> dynamicArrayExtents = {}) const -> NrAndOffset
         {
             const auto flatArrayIndex = LinearizeArrayDimsFunctor{}(coord, arrayDimsSize);
             const auto blockIndex = flatArrayIndex / Lanes;

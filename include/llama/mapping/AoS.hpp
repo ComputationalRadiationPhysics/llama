@@ -45,8 +45,10 @@ namespace llama::mapping
                 * flatSizeOf<typename Flattener::FlatRecordDim, AlignAndPad>;
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(ArrayDims coord) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(
+            ArrayDims coord,
+            Array<std::size_t, N> dynamicArrayExtents = {}) const -> NrAndOffset
         {
             constexpr std::size_t flatIndex =
 #ifdef __NVCC__

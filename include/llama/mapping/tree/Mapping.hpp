@@ -202,8 +202,9 @@ namespace llama::mapping::tree
             return internal::getTreeBlobSize(resultTree);
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE auto blobNrAndOffset(ArrayDims coord) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE auto blobNrAndOffset(ArrayDims coord, Array<std::size_t, N> dynamicArrayExtents = {})
+            const -> NrAndOffset
         {
             auto const basicTreeCoord = createTreeCoord<RecordCoord<RecordCoords...>>(coord);
             auto const resultTreeCoord = mergedFunctors.basicCoordToResultCoord(basicTreeCoord, basicTree);

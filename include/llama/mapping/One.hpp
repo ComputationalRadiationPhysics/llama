@@ -38,8 +38,9 @@ namespace llama::mapping
             return sizeOf<RecordDim>;
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(ArrayDims) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(ArrayDims, Array<std::size_t, N> = {}) const
+            -> NrAndOffset
         {
             constexpr auto offset = offsetOf<RecordDim, RecordCoord<RecordCoords...>>;
             return {0, offset};
