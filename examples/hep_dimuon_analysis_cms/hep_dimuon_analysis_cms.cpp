@@ -11,6 +11,7 @@
 #include <TLatex.h>
 #include <TStyle.h>
 #include <TSystem.h>
+#include <cassert>
 #include <chrono>
 #include <fstream>
 #include <future>
@@ -84,7 +85,7 @@ static void Show(TH1D& h)
     }
 }
 
-constexpr auto elementsPerPage = 4096;
+constexpr std::size_t elementsPerPage = 4096;
 using Page = std::vector<std::byte>;
 
 // based on ROOT tutorial df102_NanoAODDimuonAnalysis
@@ -121,7 +122,7 @@ auto buildRNTupleFileModel(const std::string& path)
     copy(viewPhi, model["Muon_phi"]);
     copy(viewMass, model["Muon_mass"]);
 
-    return model;
+    return std::tuple{ntuple->GetNEntries(), model};
 }
 
 int main(int argc, const char* argv[])
@@ -132,62 +133,95 @@ int main(int argc, const char* argv[])
         return 1;
     }
 
-    auto rntuple = buildRNTupleFileModel(argv[1]);
+    auto [entries, rntuple] = buildRNTupleFileModel(argv[1]);
+    auto& Muons_endPages = rntuple.at("Muons_end");
+    auto& Muon_chargePages = rntuple.at("Muon_charge");
+    auto& Muon_phiPages = rntuple.at("Muon_phi");
+    auto& Muon_ptPages = rntuple.at("Muon_pt");
+    auto& Muon_etaPages = rntuple.at("Muon_eta");
+    auto& Muon_massPages = rntuple.at("Muon_mass");
 
     auto ts_init = std::chrono::steady_clock::now();
 
+    auto viewEventPage = [&](std::size_t i) {
+        return llama::View{
+            llama::mapping::SoA<llama::ArrayDomain<1>, Event, std::true_type>{llama::ArrayDomain{elementsPerPage}},
+            llama::Array<std::byte*, 1>{Muons_endPages.at(i).data()}};
+    };
+    auto viewMuonPage = [&](std::size_t i) {
+        return llama::View{
+            llama::mapping::SoA<llama::ArrayDomain<1>, Muon, std::true_type>{llama::ArrayDomain{elementsPerPage}},
+            llama::Array<std::byte*, 5>{
+                Muon_chargePages.at(i).data(),
+                Muon_phiPages.at(i).data(),
+                Muon_ptPages.at(i).data(),
+                Muon_etaPages.at(i).data(),
+                Muon_massPages.at(i).data()}};
+    };
+
     auto hMass = TH1D("Dimuon_mass", "Dimuon_mass", 2000, 0.25, 300);
 
-    std::size_t eventCount = elementsPerPage;
-    std::size_t muonCount = elementsPerPage;
-    auto eventView = llama::View{
-        llama::mapping::SoA<llama::ArrayDomain<1>, Event, std::true_type>{llama::ArrayDomain{eventCount}},
-        llama::Array<std::byte*, 1>{rntuple.at("Muons_end").front().data()}};
-
-    auto muonView = llama::View{
-        llama::mapping::SoA<llama::ArrayDomain<1>, Muon, std::true_type>{llama::ArrayDomain{muonCount}},
-        llama::Array<std::byte*, 5>{
-            rntuple.at("Muon_charge").front().data(),
-            rntuple.at("Muon_phi").front().data(),
-            rntuple.at("Muon_pt").front().data(),
-            rntuple.at("Muon_eta").front().data(),
-            rntuple.at("Muon_mass").front().data()}};
+    const auto pageCount = (entries + elementsPerPage - 1) / elementsPerPage;
+    fmt::print("Processing {} events on {} pages\n", entries, pageCount);
 
     const auto ts_first = std::chrono::steady_clock::now();
-    for (std::size_t e = 0; e < eventCount; e++)
+    for (std::size_t ep = 0; ep < pageCount; ep++)
     {
-        const auto muonOffset = e == 0 ? ROOT::Experimental::ClusterSize_t{0} : eventView(e - 1)(tag::Muons_end{});
-        const auto muonCount = eventView(e)(tag::Muons_end{}) - muonOffset;
-        fmt::print("Event {}, offset {}, count {}\n", e, eventView(e)(tag::Muons_end{}), muonCount);
-        if (muonCount != 2)
-            continue;
+        fmt::print("Event page {}\n", ep);
 
-        if (muonOffset >= elementsPerPage) // TODO
-            continue;
-        // resolve to muons
-        auto localMuonView = llama::VirtualView{muonView, {muonOffset}, {2}};
-        if (localMuonView(0u)(tag::Muon_charge{}) == localMuonView(1u)(tag::Muon_charge{}))
-            continue;
-
-        float x_sum = 0;
-        float y_sum = 0;
-        float z_sum = 0;
-        float e_sum = 0;
-        for (std::size_t m = 0u; m < 2; ++m)
+        auto eventView = viewEventPage(ep);
+        const auto eventsOnThisPage = std::min(elementsPerPage, entries - ep * elementsPerPage);
+        for (std::size_t e = 0; e < eventsOnThisPage; e++)
         {
-            const auto x = localMuonView(m)(tag::Muon_pt{}) * std::cos(localMuonView(m)(tag::Muon_phi{}));
-            x_sum += x;
-            const auto y = localMuonView(m)(tag::Muon_pt{}) * std::sin(localMuonView(m)(tag::Muon_phi{}));
-            y_sum += y;
-            const auto z = localMuonView(m)(tag::Muon_pt{}) * std::sinh(localMuonView(m)(tag::Muon_eta{}));
-            z_sum += z;
-            const auto e = std::sqrt(
-                x * x + y * y + z * z + localMuonView(m)(tag::Muon_mass{}) * localMuonView(m)(tag::Muon_mass{}));
-            e_sum += e;
-        }
+            const auto muonOffset = e == 0 ? ROOT::Experimental::ClusterSize_t{0} : eventView(e - 1)(tag::Muons_end{});
+            const auto muonCount = eventView(e)(tag::Muons_end{}) - muonOffset;
+            // fmt::print(
+            //    "Event page {}, event {}, offset {}, count {}\n",
+            //    ep,
+            //    e,
+            //    eventView(e)(tag::Muons_end{}),
+            //    muonCount);
+            if (muonCount != 2)
+                continue;
 
-        auto mass = std::sqrt(e_sum * e_sum - x_sum * x_sum - y_sum * y_sum - z_sum * z_sum);
-        hMass.Fill(mass);
+            auto muonView = viewMuonPage(muonOffset / elementsPerPage);
+
+            auto processDimuons = [&](auto dimuonView) {
+                if (dimuonView(0u)(tag::Muon_charge{}) == dimuonView(1u)(tag::Muon_charge{}))
+                    return;
+
+                float x_sum = 0;
+                float y_sum = 0;
+                float z_sum = 0;
+                float e_sum = 0;
+                for (std::size_t m = 0u; m < 2; ++m)
+                {
+                    const auto x = dimuonView(m)(tag::Muon_pt{}) * std::cos(dimuonView(m)(tag::Muon_phi{}));
+                    x_sum += x;
+                    const auto y = dimuonView(m)(tag::Muon_pt{}) * std::sin(dimuonView(m)(tag::Muon_phi{}));
+                    y_sum += y;
+                    const auto z = dimuonView(m)(tag::Muon_pt{}) * std::sinh(dimuonView(m)(tag::Muon_eta{}));
+                    z_sum += z;
+                    const auto e = std::sqrt(
+                        x * x + y * y + z * z + dimuonView(m)(tag::Muon_mass{}) * dimuonView(m)(tag::Muon_mass{}));
+                    e_sum += e;
+                }
+
+                auto mass = std::sqrt(e_sum * e_sum - x_sum * x_sum - y_sum * y_sum - z_sum * z_sum);
+                hMass.Fill(mass);
+            };
+            const auto muonPageOffset = muonOffset % elementsPerPage;
+            if (muonPageOffset + 2 <= elementsPerPage)
+                processDimuons(llama::VirtualView{muonView, {muonPageOffset}, {2}});
+            else
+            {
+                constexpr auto mapping = llama::mapping::SoA<llama::ArrayDomain<2>, Muon>{{2}};
+                auto dimuonView = llama::allocView(mapping, llama::bloballoc::Stack<mapping.blobSize(0)>{});
+                dimuonView(0u) = muonView(muonPageOffset);
+                dimuonView(1u) = viewMuonPage(muonOffset / elementsPerPage + 1)(0u);
+                processDimuons(dimuonView);
+            }
+        }
     }
 
     auto ts_end = std::chrono::steady_clock::now();
