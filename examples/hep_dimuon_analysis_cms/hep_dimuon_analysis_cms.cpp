@@ -46,12 +46,12 @@ using Muon = llama::DS<
 
 static void Show(TH1D& h)
 {
-    new TApplication("", nullptr, nullptr);
+    auto app = TApplication("", nullptr, nullptr);
 
     gStyle->SetTextFont(42);
-    auto c = new TCanvas("c", "", 800, 700);
-    c->SetLogx();
-    c->SetLogy();
+    auto c = TCanvas("c", "", 800, 700);
+    c.SetLogx();
+    c.SetLogy();
 
     h.SetTitle("");
     h.GetXaxis()->SetTitle("m_{#mu#mu} (GeV)");
@@ -73,9 +73,9 @@ static void Show(TH1D& h)
     label.DrawLatex(0.100, 0.920, "#bf{CMS Open Data}");
     label.SetTextSize(0.030);
     label.DrawLatex(0.50, 0.920, "#sqrt{s} = 8 TeV, L_{int} = 11.6 fb^{-1}");
-    c->Modified();
+    c.Modified();
 
-    std::cout << "press ENTER to exit...\n";
+    fmt::print("press ENTER to exit...\n");
     auto future = std::async(std::launch::async, getchar);
     while (true)
     {
