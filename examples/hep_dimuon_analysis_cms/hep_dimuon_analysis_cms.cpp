@@ -94,6 +94,30 @@ using Page = std::vector<std::byte>;
 // /tmp/Run2012B_DoubleMuParked.root
 auto buildRNTupleFileModel(const std::string& path)
 {
+    // we cannot copy the offsets stored in the RNTuple directly, because they are local to the cluster they reside in.
+    // To correctly interpret this information, we would need access to the ClusterInfo stored in the RPage, which is
+    // not reachable via RNTupleReader.
+    auto copyOffsets = [](ROOT::Experimental::RNTupleViewCollection& view, std::vector<Page>& dstPages) {
+        using FieldType = ROOT::Experimental::ClusterSize_t;
+        FieldType* dst = nullptr;
+        auto offset = FieldType{0};
+        std::size_t written = 0;
+        for (auto i : view.GetFieldRange())
+        {
+            if (written % elementsPerPage == 0)
+                dst = (FieldType*) dstPages.emplace_back(Page(sizeof(FieldType) * elementsPerPage)).data();
+            const auto value = view(i);
+            offset += value;
+            dst[written % elementsPerPage] = offset;
+            // fmt::print(
+            //    "i {}, offset {} stored offset {}\n",
+            //    i,
+            //    offset,
+            //    static_cast<ROOT::Experimental::RNTupleView<FieldType>&>(view)(i));
+            written++;
+        }
+    };
+
     auto copy = []<typename FieldType>(ROOT::Experimental::RNTupleView<FieldType>& view, std::vector<Page>& dstPages) {
         FieldType* dst = nullptr;
         std::size_t written = 0;
@@ -101,7 +125,9 @@ auto buildRNTupleFileModel(const std::string& path)
         {
             if (written % elementsPerPage == 0)
                 dst = (FieldType*) dstPages.emplace_back(Page(sizeof(FieldType) * elementsPerPage)).data();
-            dst[written % elementsPerPage] = view(i);
+            const auto value = view(i);
+            dst[written % elementsPerPage] = value;
+            // fmt::print("i {} charge {}\n", written, value);
             written++;
         }
     };
@@ -115,7 +141,7 @@ auto buildRNTupleFileModel(const std::string& path)
     auto viewMass = viewMuon.GetView<float>("nMuon.Muon_mass");
 
     std::unordered_map<std::string, std::vector<Page>> model;
-    copy(viewMuon, model["Muons_end"]);
+    copyOffsets(viewMuon, model["Muons_end"]);
     copy(viewCharge, model["Muon_charge"]);
     copy(viewPt, model["Muon_pt"]);
     copy(viewEta, model["Muon_eta"]);
@@ -129,11 +155,16 @@ int main(int argc, const char* argv[])
 {
     if (argc != 2)
     {
-        std::cout << "Please specify input file!\n";
+        fmt::print("Please specify input file!\n");
         return 1;
     }
 
+    using namespace std::chrono;
+
+    auto start = steady_clock::now();
     auto [entries, rntuple] = buildRNTupleFileModel(argv[1]);
+    fmt::print("Copy RNTuple -> byte pages: {}us\n", duration_cast<microseconds>(steady_clock::now() - start).count());
+
     auto& Muons_endPages = rntuple.at("Muons_end");
     auto& Muon_chargePages = rntuple.at("Muon_charge");
     auto& Muon_phiPages = rntuple.at("Muon_phi");
@@ -141,8 +172,7 @@ int main(int argc, const char* argv[])
     auto& Muon_etaPages = rntuple.at("Muon_eta");
     auto& Muon_massPages = rntuple.at("Muon_mass");
 
-    auto ts_init = std::chrono::steady_clock::now();
-
+    start = std::chrono::steady_clock::now();
     auto viewEventPage = [&](std::size_t i) {
         return llama::View{
             llama::mapping::SoA<llama::ArrayDomain<1>, Event, std::true_type>{llama::ArrayDomain{elementsPerPage}},
@@ -158,33 +188,39 @@ int main(int argc, const char* argv[])
                 Muon_etaPages.at(i).data(),
                 Muon_massPages.at(i).data()}};
     };
+    fmt::print("Construct LLAMA view: {}us\n", duration_cast<microseconds>(steady_clock::now() - start).count());
 
     auto hMass = TH1D("Dimuon_mass", "Dimuon_mass", 2000, 0.25, 300);
 
     const auto pageCount = (entries + elementsPerPage - 1) / elementsPerPage;
     fmt::print("Processing {} events on {} pages\n", entries, pageCount);
 
-    const auto ts_first = std::chrono::steady_clock::now();
+    start = std::chrono::steady_clock::now();
     for (std::size_t ep = 0; ep < pageCount; ep++)
     {
-        fmt::print("Event page {}\n", ep);
-
         auto eventView = viewEventPage(ep);
         const auto eventsOnThisPage = std::min(elementsPerPage, entries - ep * elementsPerPage);
         for (std::size_t e = 0; e < eventsOnThisPage; e++)
         {
-            const auto muonOffset = e == 0 ? ROOT::Experimental::ClusterSize_t{0} : eventView(e - 1)(tag::Muons_end{});
-            const auto muonCount = eventView(e)(tag::Muons_end{}) - muonOffset;
-            // fmt::print(
-            //    "Event page {}, event {}, offset {}, count {}\n",
-            //    ep,
-            //    e,
-            //    eventView(e)(tag::Muons_end{}),
-            //    muonCount);
+            const auto muonOffset = [&]() {
+                if (e == 0)
+                {
+                    if (ep == 0)
+                        return ROOT::Experimental::ClusterSize_t{0};
+                    return viewEventPage(ep - 1)(elementsPerPage - 1)(tag::Muons_end{});
+                }
+                return eventView(e - 1)(tag::Muons_end{});
+            }();
+            const auto nextMuonOffset = eventView(e)(tag::Muons_end{});
+            assert(muonOffset <= nextMuonOffset);
+            const auto muonCount = nextMuonOffset - muonOffset;
+
             if (muonCount != 2)
                 continue;
 
-            auto muonView = viewMuonPage(muonOffset / elementsPerPage);
+            const auto muonPageIndex = muonOffset / elementsPerPage;
+            const auto muonPageInnerIndex = muonOffset % elementsPerPage;
+            auto muonView = viewMuonPage(muonPageIndex);
 
             auto processDimuons = [&](auto dimuonView) {
                 if (dimuonView(0u)(tag::Muon_charge{}) == dimuonView(1u)(tag::Muon_charge{}))
@@ -210,29 +246,20 @@ int main(int argc, const char* argv[])
                 auto mass = std::sqrt(e_sum * e_sum - x_sum * x_sum - y_sum * y_sum - z_sum * z_sum);
                 hMass.Fill(mass);
             };
-            const auto muonPageOffset = muonOffset % elementsPerPage;
-            if (muonPageOffset + 2 <= elementsPerPage)
-                processDimuons(llama::VirtualView{muonView, {muonPageOffset}, {2}});
+            if (muonPageInnerIndex + 1 < elementsPerPage)
+                processDimuons(llama::VirtualView{muonView, {muonPageInnerIndex}, {2}});
             else
             {
-                constexpr auto mapping = llama::mapping::SoA<llama::ArrayDomain<2>, Muon>{{2}};
+                constexpr auto mapping = llama::mapping::SoA<llama::ArrayDomain<1>, Muon>{{2}};
                 auto dimuonView = llama::allocView(mapping, llama::bloballoc::Stack<mapping.blobSize(0)>{});
-                dimuonView(0u) = muonView(muonPageOffset);
-                dimuonView(1u) = viewMuonPage(muonOffset / elementsPerPage + 1)(0u);
+                dimuonView(0u) = muonView(muonPageInnerIndex);
+                dimuonView(1u) = viewMuonPage(muonPageIndex + 1)(0u);
                 processDimuons(dimuonView);
             }
         }
     }
 
-    auto ts_end = std::chrono::steady_clock::now();
-    auto runtime_init = std::chrono::duration_cast<std::chrono::microseconds>(ts_first - ts_init).count();
-    auto runtime_analyze = std::chrono::duration_cast<std::chrono::microseconds>(ts_end - ts_first).count();
-
-    std::cout << "Runtime-Initialization: " << runtime_init << "us\n";
-    std::cout << "Runtime-Analysis: " << runtime_analyze << "us\n";
+    fmt::print("Analysis: {}us\n", duration_cast<microseconds>(steady_clock::now() - start).count());
 
     Show(hMass);
-
-    // std::ofstream{"hep_analysis.svg"} << llama::toSvg(mapping);
-    // std::ofstream{"hep_analysis.html"} << llama::toHtml(mapping);
 }
