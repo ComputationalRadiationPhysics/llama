@@ -31,16 +31,16 @@ namespace tag
     struct Muon_mass{};
 }
 
-using Event = llama::DS<
-    llama::DE<tag::Muons_end, ROOT::Experimental::ClusterSize_t>
+using Event = llama::Record<
+    llama::Field<tag::Muons_end, ROOT::Experimental::ClusterSize_t>
 >;
 
-using Muon = llama::DS<
-    llama::DE<tag::Muon_charge, std::int32_t>,
-    llama::DE<tag::Muon_phi, float>,
-    llama::DE<tag::Muon_pt, float>,
-    llama::DE<tag::Muon_eta, float>,
-    llama::DE<tag::Muon_mass, float>
+using Muon = llama::Record<
+    llama::Field<tag::Muon_charge, std::int32_t>,
+    llama::Field<tag::Muon_phi, float>,
+    llama::Field<tag::Muon_pt, float>,
+    llama::Field<tag::Muon_eta, float>,
+    llama::Field<tag::Muon_mass, float>
 >;
 // clang-format on
 
@@ -97,7 +97,8 @@ auto buildRNTupleFileModel(const std::string& path)
     // we cannot copy the offsets stored in the RNTuple directly, because they are local to the cluster they reside in.
     // To correctly interpret this information, we would need access to the ClusterInfo stored in the RPage, which is
     // not reachable via RNTupleReader.
-    auto copyOffsets = [](ROOT::Experimental::RNTupleViewCollection& view, std::vector<Page>& dstPages) {
+    auto copyOffsets = [](ROOT::Experimental::RNTupleViewCollection& view, std::vector<Page>& dstPages)
+    {
         using FieldType = ROOT::Experimental::ClusterSize_t;
         FieldType* dst = nullptr;
         auto offset = FieldType{0};
@@ -118,7 +119,8 @@ auto buildRNTupleFileModel(const std::string& path)
         }
     };
 
-    auto copy = []<typename FieldType>(ROOT::Experimental::RNTupleView<FieldType>& view, std::vector<Page>& dstPages) {
+    auto copy = []<typename FieldType>(ROOT::Experimental::RNTupleView<FieldType>& view, std::vector<Page>& dstPages)
+    {
         FieldType* dst = nullptr;
         std::size_t written = 0;
         for (auto i : view.GetFieldRange())
@@ -173,14 +175,16 @@ int main(int argc, const char* argv[])
     auto& Muon_massPages = rntuple.at("Muon_mass");
 
     start = std::chrono::steady_clock::now();
-    auto viewEventPage = [&](std::size_t i) {
+    auto viewEventPage = [&](std::size_t i)
+    {
         return llama::View{
-            llama::mapping::SoA<llama::ArrayDomain<1>, Event, std::true_type>{llama::ArrayDomain{elementsPerPage}},
+            llama::mapping::SoA<llama::ArrayDims<1>, Event, true>{llama::ArrayDims{elementsPerPage}},
             llama::Array<std::byte*, 1>{Muons_endPages.at(i).data()}};
     };
-    auto viewMuonPage = [&](std::size_t i) {
+    auto viewMuonPage = [&](std::size_t i)
+    {
         return llama::View{
-            llama::mapping::SoA<llama::ArrayDomain<1>, Muon, std::true_type>{llama::ArrayDomain{elementsPerPage}},
+            llama::mapping::SoA<llama::ArrayDims<1>, Muon, true>{llama::ArrayDims{elementsPerPage}},
             llama::Array<std::byte*, 5>{
                 Muon_chargePages.at(i).data(),
                 Muon_phiPages.at(i).data(),
@@ -202,7 +206,8 @@ int main(int argc, const char* argv[])
         const auto eventsOnThisPage = std::min(elementsPerPage, entries - ep * elementsPerPage);
         for (std::size_t e = 0; e < eventsOnThisPage; e++)
         {
-            const auto muonOffset = [&]() {
+            const auto muonOffset = [&]()
+            {
                 if (e == 0)
                 {
                     if (ep == 0)
@@ -222,7 +227,8 @@ int main(int argc, const char* argv[])
             const auto muonPageInnerIndex = muonOffset % elementsPerPage;
             auto muonView = viewMuonPage(muonPageIndex);
 
-            auto processDimuons = [&](auto dimuonView) {
+            auto processDimuons = [&](auto dimuonView)
+            {
                 if (dimuonView(0u)(tag::Muon_charge{}) == dimuonView(1u)(tag::Muon_charge{}))
                     return;
 
@@ -250,7 +256,7 @@ int main(int argc, const char* argv[])
                 processDimuons(llama::VirtualView{muonView, {muonPageInnerIndex}, {2}});
             else
             {
-                constexpr auto mapping = llama::mapping::SoA<llama::ArrayDomain<1>, Muon>{{2}};
+                constexpr auto mapping = llama::mapping::SoA<llama::ArrayDims<1>, Muon>{{2}};
                 auto dimuonView = llama::allocView(mapping, llama::bloballoc::Stack<mapping.blobSize(0)>{});
                 dimuonView(0u) = muonView(muonPageInnerIndex);
                 dimuonView(1u) = viewMuonPage(muonPageIndex + 1)(0u);
