@@ -135,6 +135,14 @@ auto buildRNTupleFileModel(const std::string& path)
     };
 
     auto ntuple = ROOT::Experimental::RNTupleReader::Open(ROOT::Experimental::RNTupleModel::Create(), "NTuple", path);
+    try
+    {
+        ntuple->PrintInfo(ROOT::Experimental::ENTupleInfo::kStorageDetails);
+    }
+    catch (const std::exception& e)
+    {
+        fmt::print("PrintInfo error: {}", e.what());
+    }
     auto viewMuon = ntuple->GetViewCollection("nMuon");
     auto viewCharge = viewMuon.GetView<std::int32_t>("nMuon.Muon_charge");
     auto viewPt = viewMuon.GetView<float>("nMuon.Muon_pt");
