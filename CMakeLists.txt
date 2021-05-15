@@ -69,6 +69,12 @@ if (LLAMA_BUILD_EXAMPLES)
 		message(WARNING "Could not find alpaka. Alpaka examples are disabled.")
 	endif()
 
+	# ROOT examples
+	find_package(ROOT QUIET)
+	if (ROOT_FOUND)
+		add_subdirectory("examples/hep_rntuple")
+	endif()
+
 	# CUDA examples
 	include(CheckLanguage)
 	check_language(CUDA)
