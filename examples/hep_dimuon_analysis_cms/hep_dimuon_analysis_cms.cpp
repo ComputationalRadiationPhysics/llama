@@ -253,7 +253,7 @@ int main(int argc, const char* argv[])
                 hMass.Fill(mass);
             };
             if (muonPageInnerIndex + 1 < elementsPerPage)
-                processDimuons(llama::VirtualView{muonView, {muonPageInnerIndex}, {2}});
+                processDimuons(llama::VirtualView{muonView, {muonPageInnerIndex}});
             else
             {
                 constexpr auto mapping = llama::mapping::SoA<llama::ArrayDims<1>, Muon>{{2}};
