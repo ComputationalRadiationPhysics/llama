@@ -32,9 +32,9 @@ namespace llama
         LLAMA_FN_HOST_ACC_INLINE auto makeBlobArray(
             const Allocator& alloc,
             const Mapping& mapping,
-            std::integer_sequence<std::size_t, Is...>) -> Array<AllocatorBlobType<Allocator>, Mapping::blobCount>
+            std::integer_sequence<std::size_t, Is...>) -> Array<AllocatorBlobType<Allocator>, Mapping::blob_count>
         {
-            return {alloc(mapping.blobSize(Is))...};
+            return {alloc(mapping.blob_size(Is))...};
         }
     } // namespace internal
 
@@ -50,7 +50,7 @@ namespace llama
     LLAMA_FN_HOST_ACC_INLINE auto allocView(Mapping mapping = {}, const Allocator& alloc = {})
         -> View<Mapping, internal::AllocatorBlobType<Allocator>>
     {
-        auto blobs = internal::makeBlobArray(alloc, mapping, std::make_index_sequence<Mapping::blobCount>{});
+        auto blobs = internal::makeBlobArray(alloc, mapping, std::make_index_sequence<Mapping::blob_count>{});
         return {std::move(mapping), std::move(blobs)};
     }
 
@@ -248,7 +248,7 @@ namespace llama
         View() = default;
 
         LLAMA_FN_HOST_ACC_INLINE
-        View(Mapping mapping, Array<BlobType, Mapping::blobCount> storageBlobs)
+        View(Mapping mapping, Array<BlobType, Mapping::blob_count> storageBlobs)
             : mapping(std::move(mapping))
             , storageBlobs(std::move(storageBlobs))
         {
@@ -365,7 +365,7 @@ namespace llama
         }
 
         Mapping mapping;
-        Array<BlobType, Mapping::blobCount> storageBlobs;
+        Array<BlobType, Mapping::blob_count> storageBlobs;
 
     private:
         template <typename T_View, typename T_BoundRecordCoord, bool OwnView>
@@ -380,7 +380,7 @@ namespace llama
                 return mapping.compute(arrayDims, dc, storageBlobs);
             else
             {
-                const auto [nr, offset] = mapping.template blobNrAndOffset<Coords...>(arrayDims);
+                const auto [nr, offset] = mapping.template blob_nr_and_offset<Coords...>(arrayDims);
                 using Type = GetType<RecordDim, RecordCoord<Coords...>>;
                 return reinterpret_cast<const Type&>(storageBlobs[nr][offset]);
             }
@@ -394,7 +394,7 @@ namespace llama
                 return mapping.compute(arrayDims, dc, storageBlobs);
             else
             {
-                const auto [nr, offset] = mapping.template blobNrAndOffset<Coords...>(arrayDims);
+                const auto [nr, offset] = mapping.template blob_nr_and_offset<Coords...>(arrayDims);
                 using Type = GetType<RecordDim, RecordCoord<Coords...>>;
                 return reinterpret_cast<Type&>(storageBlobs[nr][offset]);
             }

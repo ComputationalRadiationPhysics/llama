@@ -19,7 +19,7 @@ namespace
     >;
     // clang-format on
 
-    auto oneParticleInt()
+    auto one_particle_int()
     {
         llama::One<ParticleInt> record;
         record(tag::Pos{}, tag::A{}) = 1;
@@ -88,7 +88,7 @@ TEST_CASE("VirtualRecord.operator=")
 TEST_CASE("VirtualRecord.operator+=.scalar")
 {
     {
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Pos{}) += 1;
         CHECK(record(tag::Pos{}, tag::A{}) == 2);
         CHECK(record(tag::Pos{}, tag::Y{}) == 3);
@@ -99,7 +99,7 @@ TEST_CASE("VirtualRecord.operator+=.scalar")
     }
 
     {
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record += 1;
         CHECK(record(tag::Pos{}, tag::A{}) == 2);
         CHECK(record(tag::Pos{}, tag::Y{}) == 3);
@@ -114,7 +114,7 @@ TEST_CASE("VirtualRecord.operator+=.VirtualRecord")
 {
     {
         // smaller virtual record to larger virtual record
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Vel{}) += record(tag::Pos{});
         CHECK(record(tag::Pos{}, tag::A{}) == 1);
         CHECK(record(tag::Pos{}, tag::Y{}) == 2);
@@ -126,7 +126,7 @@ TEST_CASE("VirtualRecord.operator+=.VirtualRecord")
 
     {
         // larger virtual record to smaller virtual record
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Pos{}) += record(tag::Vel{});
         CHECK(record(tag::Pos{}, tag::A{}) == 1);
         CHECK(record(tag::Pos{}, tag::Y{}) == 6);
@@ -138,7 +138,7 @@ TEST_CASE("VirtualRecord.operator+=.VirtualRecord")
 
     {
         // scalar virtual record to larger virtual record, full broadcast
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Vel{}) += record(tag::Mass{});
         CHECK(record(tag::Pos{}, tag::A{}) == 1);
         CHECK(record(tag::Pos{}, tag::Y{}) == 2);
@@ -152,7 +152,7 @@ TEST_CASE("VirtualRecord.operator+=.VirtualRecord")
 TEST_CASE("VirtualRecord.operator+.scalar")
 {
     {
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Pos{}) = record(tag::Pos{}) + 1;
         CHECK(record(tag::Pos{}, tag::A{}) == 2);
         CHECK(record(tag::Pos{}, tag::Y{}) == 3);
@@ -162,7 +162,7 @@ TEST_CASE("VirtualRecord.operator+.scalar")
         CHECK(record(tag::Mass{}) == 6);
     }
     {
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Pos{}) = 1 + record(tag::Pos{});
         CHECK(record(tag::Pos{}, tag::A{}) == 2);
         CHECK(record(tag::Pos{}, tag::Y{}) == 3);
@@ -173,7 +173,7 @@ TEST_CASE("VirtualRecord.operator+.scalar")
     }
 
     {
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record = record + 1;
         CHECK(record(tag::Pos{}, tag::A{}) == 2);
         CHECK(record(tag::Pos{}, tag::Y{}) == 3);
@@ -183,7 +183,7 @@ TEST_CASE("VirtualRecord.operator+.scalar")
         CHECK(record(tag::Mass{}) == 7);
     }
     {
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record = 1 + record;
         CHECK(record(tag::Pos{}, tag::A{}) == 2);
         CHECK(record(tag::Pos{}, tag::Y{}) == 3);
@@ -198,7 +198,7 @@ TEST_CASE("VirtualRecord.operator+.VirtualRecord")
 {
     {
         // smaller virtual record to larger virtual record
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Vel{}) = record(tag::Vel{}) + record(tag::Pos{});
         CHECK(record(tag::Pos{}, tag::A{}) == 1);
         CHECK(record(tag::Pos{}, tag::Y{}) == 2);
@@ -210,7 +210,7 @@ TEST_CASE("VirtualRecord.operator+.VirtualRecord")
 
     {
         // larger virtual record to smaller virtual record
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Pos{}) = record(tag::Pos{}) + record(tag::Vel{});
         CHECK(record(tag::Pos{}, tag::A{}) == 1);
         CHECK(record(tag::Pos{}, tag::Y{}) == 6);
@@ -222,7 +222,7 @@ TEST_CASE("VirtualRecord.operator+.VirtualRecord")
 
     {
         // scalar virtual record to larger virtual record, full broadcast
-        auto record = oneParticleInt();
+        auto record = one_particle_int();
         record(tag::Vel{}) = record(tag::Vel{}) + record(tag::Mass{});
         CHECK(record(tag::Pos{}, tag::A{}) == 1);
         CHECK(record(tag::Pos{}, tag::Y{}) == 2);
@@ -925,7 +925,7 @@ TEST_CASE("VirtualRecord.One_concepts")
 TEST_CASE("VirtualRecord.One_inside_std::vector")
 {
     std::vector<llama::One<ParticleInt>> v(2); // create 2 One
-    v.push_back(oneParticleInt()); // add 1 more
+    v.push_back(one_particle_int()); // add 1 more
     v[0](tag::Mass{}) = 20;
     v[1](tag::Mass{}) = 30;
     v[2](tag::Mass{}) = 10;
@@ -957,7 +957,7 @@ TEST_CASE("VirtualRecord.operator<<")
 
     std::stringstream ss;
     ss << p;
-    const auto expected
+    const auto* const expected
         = "{Pos: {X: 1, Y: 2, Z: 3}, Mass: 4, Vel: {X: 5, Y: 6, Z: 7}, Flags: {[0]: 1, [1]: 1, [2]: 1, [3]: 1}}";
     CHECK(ss.str() == expected);
 

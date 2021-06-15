@@ -12,25 +12,25 @@ namespace
         llama::Field<tag::C, Vec3D>,
         llama::Field<tag::Normal, Vec3D>>;
 
-    template <typename ArrayDims, typename RecordDim>
-    struct AoSWithComputedNormal : llama::mapping::PackedAoS<ArrayDims, RecordDim>
+    template <typename TArrayDims, typename TRecordDim>
+    struct AoSWithComputedNormal : llama::mapping::PackedAoS<TArrayDims, TRecordDim>
     {
-        using Base = llama::mapping::PackedAoS<ArrayDims, RecordDim>;
+        using Base = llama::mapping::PackedAoS<TArrayDims, TRecordDim>;
 
-        template <std::size_t... RecordCoords>
-        static constexpr auto isComputed(llama::RecordCoord<RecordCoords...>)
+        template <std::size_t... TRecordCoords>
+        static constexpr auto is_computed(llama::RecordCoord<TRecordCoords...>)
         {
-            return llama::RecordCoordCommonPrefixIsSame<llama::RecordCoord<RecordCoords...>, llama::RecordCoord<3>>;
+            return llama::RecordCoordCommonPrefixIsSame<llama::RecordCoord<TRecordCoords...>, llama::RecordCoord<3>>;
         }
 
-        template <std::size_t... RecordCoords, typename Blob>
+        template <std::size_t... TRecordCoords, typename TBlob>
         constexpr auto compute(
-            ArrayDims coord,
-            llama::RecordCoord<RecordCoords...>,
-            llama::Array<Blob, Base::blobCount>& storageBlobs) const
+            TArrayDims coord,
+            llama::RecordCoord<TRecordCoords...>,
+            llama::Array<TBlob, Base::blobCount>& storage_blobs) const
         {
-            auto fetch = [&](llama::NrAndOffset nrAndOffset) -> double
-            { return *reinterpret_cast<double*>(&storageBlobs[nrAndOffset.nr][nrAndOffset.offset]); };
+            auto fetch = [storage_blobs](llama::NrAndOffset nr_and_offset) -> double
+            { return *reinterpret_cast<double*>(&storage_blobs[nr_and_offset.nr][nr_and_offset.offset]); };
 
             const auto ax = fetch(Base::template blobNrAndOffset<0, 0>(coord));
             const auto ay = fetch(Base::template blobNrAndOffset<0, 1>(coord));
@@ -59,7 +59,7 @@ namespace
             const auto normaly = crossy / length;
             const auto normalz = crossz / length;
 
-            using DC = llama::RecordCoord<RecordCoords...>;
+            using DC = llama::RecordCoord<TRecordCoords...>;
             if constexpr (std::is_same_v<DC, llama::RecordCoord<3, 0>>)
                 return normalx;
             if constexpr (std::is_same_v<DC, llama::RecordCoord<3, 1>>)
@@ -80,8 +80,8 @@ namespace
 
 TEST_CASE("computedprop")
 {
-    auto arrayDims = llama::ArrayDims<1>{10};
-    auto mapping = AoSWithComputedNormal<decltype(arrayDims), Triangle>{arrayDims};
+    auto array_dims = llama::ArrayDims<1>{10};
+    auto mapping = AoSWithComputedNormal<decltype(array_dims), Triangle>{array_dims};
 
     STATIC_REQUIRE(mapping.blobCount == 1);
     CHECK(mapping.blobSize(0) == 10 * 12 * sizeof(double));
@@ -109,27 +109,27 @@ TEST_CASE("computedprop")
 namespace
 {
     // Maps accesses to the product of the ArrayDims coord.
-    template <typename T_ArrayDims, typename T_RecordDim>
+    template <typename TTArrayDims, typename TTRecordDim>
     struct ComputedMapping
     {
-        using ArrayDims = T_ArrayDims;
-        using RecordDim = T_RecordDim;
+        using ArrayDims = TTArrayDims;
+        using RecordDim = TTRecordDim;
         static constexpr std::size_t blobCount = 0;
 
         constexpr ComputedMapping() = default;
 
-        constexpr ComputedMapping(ArrayDims, RecordDim = {})
+        constexpr explicit ComputedMapping(ArrayDims, RecordDim = {})
         {
         }
 
-        template <std::size_t... RecordCoords>
-        static constexpr auto isComputed(llama::RecordCoord<RecordCoords...>)
+        template <std::size_t... TRecordCoords>
+        static constexpr auto is_computed(llama::RecordCoord<TRecordCoords...>)
         {
             return true;
         }
 
-        template <std::size_t... RecordCoords, typename Blob>
-        constexpr auto compute(ArrayDims coord, llama::RecordCoord<RecordCoords...>, llama::Array<Blob, blobCount>&)
+        template <std::size_t... TRecordCoords, typename TBlob>
+        constexpr auto compute(ArrayDims coord, llama::RecordCoord<TRecordCoords...>, llama::Array<TBlob, blobCount>&)
             const -> std::size_t
         {
             return std::reduce(std::begin(coord), std::end(coord), std::size_t{1}, std::multiplies<>{});
@@ -139,8 +139,8 @@ namespace
 
 TEST_CASE("fully_computed_mapping")
 {
-    auto arrayDims = llama::ArrayDims<3>{10, 10, 10};
-    auto mapping = ComputedMapping<decltype(arrayDims), Triangle>{arrayDims};
+    auto array_dims = llama::ArrayDims<3>{10, 10, 10};
+    auto mapping = ComputedMapping<decltype(array_dims), Triangle>{array_dims};
 
     auto view = llama::allocView(mapping);
 
@@ -153,18 +153,18 @@ TEST_CASE("fully_computed_mapping")
 namespace
 {
     template <
-        typename T_ArrayDims,
-        typename T_RecordDim,
-        typename LinearizeArrayDimsFunctor = llama::mapping::LinearizeArrayDimsCpp>
+        typename TTArrayDims,
+        typename TTRecordDim,
+        typename TLinearizeArrayDimsFunctor = llama::mapping::LinearizeArrayDimsCpp>
     struct CompressedBoolMapping
     {
-        using ArrayDims = T_ArrayDims;
-        using RecordDim = T_RecordDim;
-        static constexpr std::size_t blobCount = boost::mp11::mp_size<llama::FlatRecordDim<RecordDim>>::value;
+        using ArrayDims = TTArrayDims;
+        using RecordDim = TTRecordDim;
+        static constexpr std::size_t blob_count = boost::mp11::mp_size<llama::FlatRecordDim<RecordDim>>::value;
 
         constexpr CompressedBoolMapping() = default;
 
-        constexpr CompressedBoolMapping(ArrayDims size) : arrayDimsSize(size)
+        constexpr explicit CompressedBoolMapping(ArrayDims size) : array_dims_size(size)
         {
         }
 
@@ -175,49 +175,50 @@ namespace
             Word& word;
             unsigned char bit;
 
-            operator bool() const
+            explicit operator bool() const
             {
-                return word & (Word{1} << bit);
+                return (word & (Word{1} << bit)) != 0u;
             }
 
             auto operator=(bool b) -> BoolRef
             {
-                word ^= (-Word{b} ^ word) & (Word{1} << bit);
+                word ^= (-Word{static_cast<(anonymous namespace)::CompressedBoolMapping::Word>(b)} ^ word)
+                    & (Word{1} << bit);
                 return *this;
             }
         };
 
-        constexpr auto blobSize(std::size_t) const -> std::size_t
+        constexpr auto blob_size(std::size_t) const -> std::size_t
         {
             llama::forEachLeaf<RecordDim>([](auto coord) constexpr {
                 static_assert(std::is_same_v<llama::GetType<RecordDim, decltype(coord)>, bool>);
             });
-            constexpr std::size_t wordBytes = sizeof(Word);
-            return (LinearizeArrayDimsFunctor{}.size(arrayDimsSize) + wordBytes - 1) / wordBytes;
+            constexpr std::size_t word_bytes = sizeof(Word);
+            return (TLinearizeArrayDimsFunctor{}.size(array_dims_size) + word_bytes - 1) / word_bytes;
         }
 
-        template <std::size_t... RecordCoords>
-        static constexpr auto isComputed(llama::RecordCoord<RecordCoords...>)
+        template <std::size_t... TRecordCoords>
+        static constexpr auto is_computed(llama::RecordCoord<TRecordCoords...>)
         {
             return true;
         }
 
-        template <std::size_t... RecordCoords, typename Blob>
+        template <std::size_t... TRecordCoords, typename TBlob>
         constexpr auto compute(
             ArrayDims coord,
-            llama::RecordCoord<RecordCoords...>,
-            llama::Array<Blob, blobCount>& blobs) const -> BoolRef
+            llama::RecordCoord<TRecordCoords...>,
+            llama::Array<TBlob, blob_count>& blobs) const -> BoolRef
         {
-            const auto bitOffset = LinearizeArrayDimsFunctor{}(coord, arrayDimsSize);
-            const auto blob = llama::flatRecordCoord<RecordDim, llama::RecordCoord<RecordCoords...>>;
+            const auto bit_offset = TLinearizeArrayDimsFunctor{}(coord, array_dims_size);
+            const auto blob = llama::flatRecordCoord<RecordDim, llama::RecordCoord<TRecordCoords...>>;
 
-            constexpr std::size_t wordBits = sizeof(Word) * CHAR_BIT;
+            constexpr std::size_t word_bits = sizeof(Word) * CHAR_BIT;
             return BoolRef{
-                reinterpret_cast<Word&>(blobs[blob][bitOffset / wordBits]),
-                static_cast<unsigned char>(bitOffset % wordBits)};
+                reinterpret_cast<Word&>(blobs[blob][bit_offset / word_bits]),
+                static_cast<unsigned char>(bit_offset % word_bits)};
         }
 
-        ArrayDims arrayDimsSize;
+        ArrayDims array_dims_size;
     };
 
     // clang-format off
@@ -233,12 +234,12 @@ namespace
 
 TEST_CASE("compressed_bools")
 {
-    auto arrayDims = llama::ArrayDims{8, 8};
-    auto mapping = CompressedBoolMapping<decltype(arrayDims), BoolRecord>{arrayDims};
-    STATIC_REQUIRE(decltype(mapping)::blobCount == 3);
-    CHECK(mapping.blobSize(0) == 8);
-    CHECK(mapping.blobSize(1) == 8);
-    CHECK(mapping.blobSize(2) == 8);
+    auto array_dims = llama::ArrayDims{8, 8};
+    auto mapping = CompressedBoolMapping<decltype(array_dims), BoolRecord>{array_dims};
+    STATIC_REQUIRE(decltype(mapping)::blob_count == 3);
+    CHECK(mapping.blob_size(0) == 8);
+    CHECK(mapping.blob_size(1) == 8);
+    CHECK(mapping.blob_size(2) == 8);
 
     auto view = llama::allocView(mapping);
     for (auto y = 0u; y < 8; y++)

@@ -21,173 +21,173 @@ using Vector = llama::Record<
 >;
 // clang-format on
 
-template <template <typename, typename> typename InnerMapping, typename T_ArrayDims, typename T_RecordDim>
+template <template <typename, typename> typename TInnerMapping, typename TTArrayDims, typename TTRecordDim>
 struct GuardMapping2D
 {
-    static_assert(std::is_same_v<T_ArrayDims, llama::ArrayDims<2>>, "Only 2D arrays are implemented");
+    static_assert(std::is_same_v<TTArrayDims, llama::ArrayDims<2>>, "Only 2D arrays are implemented");
 
-    using ArrayDims = T_ArrayDims;
-    using RecordDim = T_RecordDim;
+    using ArrayDims = TTArrayDims;
+    using RecordDim = TTRecordDim;
 
     constexpr GuardMapping2D() = default;
 
     constexpr explicit GuardMapping2D(ArrayDims size, RecordDim = {})
-        : arrayDimsSize(size)
-        , left({size[0] - 2})
-        , right({size[0] - 2})
-        , top({size[1] - 2})
-        , bot({size[1] - 2})
-        , center({size[0] - 2, size[1] - 2})
+        : m_array_dims_size(size)
+        , m_left({size[0] - 2})
+        , m_right({size[0] - 2})
+        , m_top({size[1] - 2})
+        , m_bot({size[1] - 2})
+        , m_center({size[0] - 2, size[1] - 2})
     {
     }
 
-    constexpr auto arrayDims() const -> ArrayDims
+    constexpr auto array_dims() const -> ArrayDims
     {
-        return arrayDimsSize;
+        return m_array_dims_size;
     }
 
-    constexpr auto blobSize(std::size_t i) const -> std::size_t
+    constexpr auto blob_size(std::size_t i) const -> std::size_t
     {
-        if (i >= centerOff)
-            return center.blobSize(i - centerOff);
-        if (i >= botOff)
-            return bot.blobSize(i - botOff);
-        if (i >= topOff)
-            return top.blobSize(i - topOff);
-        if (i >= rightOff)
-            return right.blobSize(i - rightOff);
-        if (i >= leftOff)
-            return left.blobSize(i - leftOff);
-        if (i >= rightBotOff)
-            return rightBot.blobSize(i - rightBotOff);
-        if (i >= rightTopOff)
-            return rightTop.blobSize(i - rightTopOff);
-        if (i >= leftBotOff)
-            return leftBot.blobSize(i - leftBotOff);
-        if (i >= leftTopOff)
-            return leftTop.blobSize(i - leftTopOff);
+        if (i >= center_off)
+            return m_center.blobSize(i - center_off);
+        if (i >= bot_off)
+            return m_bot.blobSize(i - bot_off);
+        if (i >= top_off)
+            return m_top.blobSize(i - top_off);
+        if (i >= right_off)
+            return m_right.blobSize(i - right_off);
+        if (i >= left_off)
+            return m_left.blobSize(i - left_off);
+        if (i >= right_bot_off)
+            return m_right_bot.blobSize(i - right_bot_off);
+        if (i >= right_top_off)
+            return m_right_top.blobSize(i - right_top_off);
+        if (i >= left_bot_off)
+            return m_left_bot.blobSize(i - left_bot_off);
+        if (i >= left_top_off)
+            return m_left_top.blobSize(i - left_top_off);
         std::abort();
     }
 
-    template <std::size_t... RecordCoords>
-    constexpr auto blobNrAndOffset(ArrayDims coord) const -> llama::NrAndOffset
+    template <std::size_t... TRecordCoords>
+    constexpr auto blob_nr_and_offset(ArrayDims coord) const -> llama::NrAndOffset
     {
         // [0][0] is at left top
         const auto [row, col] = coord;
-        const auto [rowMax, colMax] = arrayDimsSize;
+        const auto [rowMax, colMax] = m_array_dims_size;
 
         if (col == 0)
         {
             if (row == 0)
-                return offsetBlobNr(leftTop.template blobNrAndOffset<RecordCoords...>({}), leftTopOff);
+                return offset_blob_nr(m_left_top.template blobNrAndOffset<TRecordCoords...>({}), left_top_off);
             if (row == rowMax - 1)
-                return offsetBlobNr(leftBot.template blobNrAndOffset<RecordCoords...>({}), leftBotOff);
-            return offsetBlobNr(left.template blobNrAndOffset<RecordCoords...>({row - 1}), leftOff);
+                return offset_blob_nr(m_left_bot.template blobNrAndOffset<TRecordCoords...>({}), left_bot_off);
+            return offset_blob_nr(m_left.template blobNrAndOffset<TRecordCoords...>({row - 1}), left_off);
         }
         if (col == colMax - 1)
         {
             if (row == 0)
-                return offsetBlobNr(rightTop.template blobNrAndOffset<RecordCoords...>({}), rightTopOff);
+                return offset_blob_nr(m_right_top.template blobNrAndOffset<TRecordCoords...>({}), right_top_off);
             if (row == rowMax - 1)
-                return offsetBlobNr(rightBot.template blobNrAndOffset<RecordCoords...>({}), rightBotOff);
-            return offsetBlobNr(right.template blobNrAndOffset<RecordCoords...>({row - 1}), rightOff);
+                return offset_blob_nr(m_right_bot.template blobNrAndOffset<TRecordCoords...>({}), right_bot_off);
+            return offset_blob_nr(m_right.template blobNrAndOffset<TRecordCoords...>({row - 1}), right_off);
         }
         if (row == 0)
-            return offsetBlobNr(top.template blobNrAndOffset<RecordCoords...>({col - 1}), topOff);
+            return offset_blob_nr(m_top.template blobNrAndOffset<TRecordCoords...>({col - 1}), top_off);
         if (row == rowMax - 1)
-            return offsetBlobNr(bot.template blobNrAndOffset<RecordCoords...>({col - 1}), botOff);
-        return offsetBlobNr(center.template blobNrAndOffset<RecordCoords...>({row - 1, col - 1}), centerOff);
+            return offset_blob_nr(m_bot.template blobNrAndOffset<TRecordCoords...>({col - 1}), bot_off);
+        return offset_blob_nr(m_center.template blobNrAndOffset<TRecordCoords...>({row - 1, col - 1}), center_off);
     }
 
-    constexpr auto centerBlobs() const
+    constexpr auto center_blobs() const
     {
-        return blobIndices(center, centerOff);
+        return blob_indices(m_center, center_off);
     }
 
-    constexpr auto leftTopBlobs() const
+    constexpr auto left_top_blobs() const
     {
-        return blobIndices(leftTop, leftTopOff);
+        return blob_indices(m_left_top, left_top_off);
     }
 
-    constexpr auto leftBotBlobs() const
+    constexpr auto left_bot_blobs() const
     {
-        return blobIndices(leftBot, leftBotOff);
+        return blobIndices(m_left_bot, left_bot_off);
     }
 
-    constexpr auto leftBlobs() const
+    constexpr auto left_blobs() const
     {
-        return blobIndices(left, leftOff);
+        return blob_indices(m_left, left_off);
     }
 
-    constexpr auto rightTopBlobs() const
+    constexpr auto right_top_blobs() const
     {
-        return blobIndices(rightTop, rightTopOff);
+        return blobIndices(m_right_top, right_top_off);
     }
 
-    constexpr auto rightBotBlobs() const
+    constexpr auto right_bot_blobs() const
     {
-        return blobIndices(rightBot, rightBotOff);
+        return blob_indices(m_right_bot, right_bot_off);
     }
 
-    constexpr auto rightBlobs() const
+    constexpr auto right_blobs() const
     {
-        return blobIndices(right, rightOff);
+        return blob_indices(m_right, right_off);
     }
 
-    constexpr auto topBlobs() const
+    constexpr auto top_blobs() const
     {
-        return blobIndices(top, topOff);
+        return blobIndices(m_top, top_off);
     }
 
-    constexpr auto botBlobs() const
+    constexpr auto bot_blobs() const
     {
-        return blobIndices(bot, botOff);
+        return blobIndices(m_bot, bot_off);
     }
 
 private:
-    constexpr auto offsetBlobNr(llama::NrAndOffset nao, std::size_t blobNrOffset) const -> llama::NrAndOffset
+    constexpr auto offset_blob_nr(llama::NrAndOffset nao, std::size_t blob_nr_offset) const -> llama::NrAndOffset
     {
-        nao.nr += blobNrOffset;
+        nao.nr += blob_nr_offset;
         return nao;
     }
 
-    template <typename Mapping>
-    constexpr auto blobIndices(const Mapping&, std::size_t offset) const
+    template <typename TMapping>
+    constexpr auto blob_indices(const TMapping&, std::size_t offset) const
     {
-        std::array<std::size_t, Mapping::blobCount> a{};
+        std::array<std::size_t, TMapping::blob_count> a{};
         std::generate(begin(a), end(a), [i = offset]() mutable { return i++; });
         return a;
     }
 
-    llama::mapping::One<ArrayDims, RecordDim> leftTop;
-    llama::mapping::One<ArrayDims, RecordDim> leftBot;
-    llama::mapping::One<ArrayDims, RecordDim> rightTop;
-    llama::mapping::One<ArrayDims, RecordDim> rightBot;
-    InnerMapping<llama::ArrayDims<1>, RecordDim> left;
-    InnerMapping<llama::ArrayDims<1>, RecordDim> right;
-    InnerMapping<llama::ArrayDims<1>, RecordDim> top;
-    InnerMapping<llama::ArrayDims<1>, RecordDim> bot;
-    InnerMapping<llama::ArrayDims<2>, RecordDim> center;
+    llama::mapping::One<ArrayDims, RecordDim> m_left_top;
+    llama::mapping::One<ArrayDims, RecordDim> m_left_bot;
+    llama::mapping::One<ArrayDims, RecordDim> m_right_top;
+    llama::mapping::One<ArrayDims, RecordDim> m_right_bot;
+    InnerMapping<llama::ArrayDims<1>, RecordDim> m_left;
+    InnerMapping<llama::ArrayDims<1>, RecordDim> m_right;
+    InnerMapping<llama::ArrayDims<1>, RecordDim> m_top;
+    InnerMapping<llama::ArrayDims<1>, RecordDim> m_bot;
+    InnerMapping<llama::ArrayDims<2>, RecordDim> m_center;
 
-    static constexpr auto leftTopOff = std::size_t{0};
-    static constexpr auto leftBotOff = leftTopOff + decltype(leftTop)::blobCount;
-    static constexpr auto rightTopOff = leftBotOff + decltype(leftBot)::blobCount;
-    static constexpr auto rightBotOff = rightTopOff + decltype(rightTop)::blobCount;
-    static constexpr auto leftOff = rightBotOff + decltype(rightBot)::blobCount;
-    static constexpr auto rightOff = leftOff + decltype(left)::blobCount;
-    static constexpr auto topOff = rightOff + decltype(right)::blobCount;
-    static constexpr auto botOff = topOff + decltype(top)::blobCount;
-    static constexpr auto centerOff = botOff + decltype(bot)::blobCount;
+    static constexpr auto left_top_off = std::size_t{0};
+    static constexpr auto left_bot_off = left_top_off + decltype(m_left_top)::blobCount;
+    static constexpr auto right_top_off = left_bot_off + decltype(m_left_bot)::blobCount;
+    static constexpr auto right_bot_off = right_top_off + decltype(m_right_top)::blobCount;
+    static constexpr auto left_off = right_bot_off + decltype(m_right_bot)::blobCount;
+    static constexpr auto right_off = left_off + decltype(m_left)::blobCount;
+    static constexpr auto top_off = right_off + decltype(m_right)::blobCount;
+    static constexpr auto bot_off = top_off + decltype(m_top)::blobCount;
+    static constexpr auto center_off = bot_off + decltype(m_bot)::blobCount;
 
 public:
-    static constexpr auto blobCount = centerOff + decltype(center)::blobCount;
+    static constexpr auto blob_count = center_off + decltype(m_center)::blobCount;
 
 private:
-    ArrayDims arrayDimsSize;
+    ArrayDims m_array_dims_size;
 };
 
-template <typename View>
-void printView(const View& view, std::size_t rows, std::size_t cols)
+template <typename TView>
+void print_view(const TView& view, std::size_t rows, std::size_t cols)
 {
     for (std::size_t row = 0; row < rows; row++)
     {
@@ -201,16 +201,16 @@ void printView(const View& view, std::size_t rows, std::size_t cols)
     }
 }
 
-template <template <typename, typename> typename Mapping>
-void run(const std::string& mappingName)
+template <template <typename, typename> typename TMapping>
+void run(const std::string& mapping_name)
 {
-    std::cout << "\n===== Mapping " << mappingName << " =====\n\n";
+    std::cout << "\n===== Mapping " << mapping_name << " =====\n\n";
 
     constexpr auto rows = 7;
     constexpr auto cols = 5;
-    const auto arrayDims = llama::ArrayDims{rows, cols};
-    const auto mapping = GuardMapping2D<Mapping, llama::ArrayDims<2>, Vector>{arrayDims};
-    std::ofstream{"bufferguard_" + mappingName + ".svg"} << llama::toSvg(mapping);
+    const auto array_dims = llama::ArrayDims{rows, cols};
+    const auto mapping = GuardMapping2D<Mapping, llama::ArrayDims<2>, Vector>{array_dims};
+    std::ofstream{"bufferguard_" + mapping_name + ".svg"} << llama::toSvg(mapping);
 
     auto view1 = allocView(mapping);
 
@@ -224,7 +224,7 @@ void run(const std::string& mappingName)
         }
 
     std::cout << "View 1:\n";
-    printView(view1, rows, cols);
+    print_view(view1, rows, cols);
 
     auto view2 = allocView(mapping);
     for (std::size_t row = 0; row < rows; row++)
@@ -232,37 +232,37 @@ void run(const std::string& mappingName)
             view2(row, col) = 0; // broadcast
 
     std::cout << "\nView 2:\n";
-    printView(view2, rows, cols);
+    print_view(view2, rows, cols);
 
-    auto copyBlobs = [&](auto& srcView, auto& dstView, auto srcBlobs, auto dstBlobs)
+    auto copy_blobs = [&](auto& src_view, auto& dst_view, auto src_blobs, auto dst_blobs)
     {
-        static_assert(srcBlobs.size() == dstBlobs.size());
-        for (auto i = 0; i < srcBlobs.size(); i++)
+        static_assert(src_blobs.size() == dst_blobs.size());
+        for (auto i = 0; i < src_blobs.size(); i++)
         {
-            const auto src = srcBlobs[i];
-            const auto dst = dstBlobs[i];
+            const auto src = src_blobs[i];
+            const auto dst = dst_blobs[i];
             assert(mapping.blobSize(src) == mapping.blobSize(dst));
-            std::memcpy(&dstView.storageBlobs[dst][0], &srcView.storageBlobs[src][0], mapping.blobSize(src));
+            std::memcpy(&dst_view.storageBlobs[dst][0], &src_view.storageBlobs[src][0], mapping.blob_size(src));
         }
     };
 
     std::cout << "\nCopy view 1 right -> view 2 left:\n";
-    copyBlobs(view1, view2, mapping.rightBlobs(), mapping.leftBlobs());
+    copy_blobs(view1, view2, mapping.right_blobs(), mapping.left_blobs());
 
     std::cout << "View 2:\n";
-    printView(view2, rows, cols);
+    print_view(view2, rows, cols);
 
     std::cout << "\nCopy view 1 left top -> view 2 right bot:\n";
-    copyBlobs(view1, view2, mapping.leftTopBlobs(), mapping.rightBotBlobs());
+    copy_blobs(view1, view2, mapping.left_top_blobs(), mapping.right_bot_blobs());
 
     std::cout << "View 2:\n";
-    printView(view2, rows, cols);
+    print_view(view2, rows, cols);
 
     std::cout << "\nCopy view 2 center -> view 1 center:\n";
-    copyBlobs(view2, view1, mapping.centerBlobs(), mapping.centerBlobs());
+    copy_blobs(view2, view1, mapping.center_blobs(), mapping.center_blobs());
 
     std::cout << "View 1:\n";
-    printView(view1, rows, cols);
+    print_view(view1, rows, cols);
 }
 
 auto main() -> int

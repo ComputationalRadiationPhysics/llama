@@ -20,20 +20,20 @@
 
 using FP = float;
 
-constexpr auto PROBLEM_SIZE = 16 * 1024;
-constexpr auto STEPS = 5;
-constexpr auto TRACE = false;
-constexpr auto HEATMAP = false;
-constexpr auto DUMP_MAPPING = false;
-constexpr auto ALLOW_RSQRT = true; // rsqrt can be way faster, but less accurate
-constexpr auto NEWTON_RAPHSON_AFTER_RSQRT
+constexpr auto problem_size = 16 * 1024;
+constexpr auto steps = 5;
+constexpr auto trace = false;
+constexpr auto heatmap = false;
+constexpr auto dump_mapping = false;
+constexpr auto allow_rsqrt = true; // rsqrt can be way faster, but less accurate
+constexpr auto newton_raphson_after_rsqrt
     = true; // generate a newton raphson refinement after explicit calls to rsqrt()
-constexpr auto RUN_UPATE = true; // run update step. Useful to disable for benchmarking the move step.
-constexpr FP TIMESTEP = 0.0001f;
-constexpr FP EPS2 = 0.01f;
+constexpr auto run_upate = true; // run update step. Useful to disable for benchmarking the move step.
+constexpr FP timestep = 0.0001f;
+constexpr FP ep_s2 = 0.01f;
 
-constexpr auto L1D_SIZE = 32 * 1024;
-constexpr auto L2D_SIZE = 512 * 1024;
+constexpr auto l1_d_size = 32 * 1024;
+constexpr auto l2_d_size = 512 * 1024;
 
 using namespace std::string_literals;
 
@@ -65,43 +65,43 @@ namespace usellama
     >;
     // clang-format on
 
-    template <typename VirtualParticleI, typename VirtualParticleJ>
-    LLAMA_FN_HOST_ACC_INLINE void pPInteraction(VirtualParticleI& pi, VirtualParticleJ pj)
+    template <typename TVirtualParticleI, typename TVirtualParticleJ>
+    LLAMA_FN_HOST_ACC_INLINE void p_p_interaction(TVirtualParticleI& pi, TVirtualParticleJ pj)
     {
         auto dist = pi(tag::Pos{}) - pj(tag::Pos{});
         dist *= dist;
-        const FP distSqr = EPS2 + dist(tag::X{}) + dist(tag::Y{}) + dist(tag::Z{});
-        const FP distSixth = distSqr * distSqr * distSqr;
-        const FP invDistCube = 1.0f / std::sqrt(distSixth);
-        const FP sts = pj(tag::Mass{}) * invDistCube * TIMESTEP;
+        const FP dist_sqr = ep_s2 + dist(tag::X{}) + dist(tag::Y{}) + dist(tag::Z{});
+        const FP dist_sixth = dist_sqr * dist_sqr * dist_sqr;
+        const FP inv_dist_cube = 1.0f / std::sqrt(dist_sixth);
+        const FP sts = pj(tag::Mass{}) * inv_dist_cube * timestep;
         pi(tag::Vel{}) += dist * sts;
     }
 
-    template <typename View>
-    void update(View& particles)
+    template <typename TView>
+    void update(TView& particles)
     {
         LLAMA_INDEPENDENT_DATA
-        for (std::size_t i = 0; i < PROBLEM_SIZE; i++)
+        for (std::size_t i = 0; i < problem_size; i++)
         {
             llama::One<Particle> pi = particles(i);
-            for (std::size_t j = 0; j < PROBLEM_SIZE; ++j)
-                pPInteraction(pi, particles(j));
+            for (std::size_t j = 0; j < problem_size; ++j)
+                p_p_interaction(pi, particles(j));
             particles(i)(tag::Vel{}) = pi(tag::Vel{});
         }
     }
 
-    template <typename View>
-    void move(View& particles)
+    template <typename TView>
+    void move(TView& particles)
     {
         LLAMA_INDEPENDENT_DATA
-        for (std::size_t i = 0; i < PROBLEM_SIZE; i++)
-            particles(i)(tag::Pos{}) += particles(i)(tag::Vel{}) * TIMESTEP;
+        for (std::size_t i = 0; i < problem_size; i++)
+            particles(i)(tag::Pos{}) += particles(i)(tag::Vel{}) * timestep;
     }
 
-    template <int Mapping, std::size_t AoSoALanes = 8 /*AVX2*/>
-    auto main(std::ostream& plotFile) -> int
+    template <int TMapping, std::size_t TAoSoALanes = 8 /*AVX2*/>
+    auto main(std::ostream& plot_file) -> int
     {
-        auto mappingName = [](int m) -> std::string
+        auto mapping_name = [](int m) -> std::string
         {
             if (m == 0)
                 return "AoS";
@@ -110,40 +110,40 @@ namespace usellama
             if (m == 2)
                 return "SoA MB";
             if (m == 3)
-                return "AoSoA" + std::to_string(AoSoALanes);
+                return "AoSoA" + std::to_string(TAoSoALanes);
             if (m == 4)
                 return "Split SoA";
             std::abort();
         };
-        auto title = "LLAMA " + mappingName(Mapping);
+        auto title = "LLAMA " + mapping_name(TMapping);
         std::cout << title << "\n";
         Stopwatch watch;
         auto mapping = [&]
         {
-            const auto arrayDims = llama::ArrayDims{PROBLEM_SIZE};
-            if constexpr (Mapping == 0)
-                return llama::mapping::AoS{arrayDims, Particle{}};
-            if constexpr (Mapping == 1)
-                return llama::mapping::SoA{arrayDims, Particle{}};
-            if constexpr (Mapping == 2)
-                return llama::mapping::SoA<decltype(arrayDims), Particle, true>{arrayDims};
-            if constexpr (Mapping == 3)
-                return llama::mapping::AoSoA<decltype(arrayDims), Particle, AoSoALanes>{arrayDims};
-            if constexpr (Mapping == 4)
+            const auto array_dims = llama::ArrayDims{problem_size};
+            if constexpr (TMapping == 0)
+                return llama::mapping::AoS{array_dims, Particle{}};
+            if constexpr (TMapping == 1)
+                return llama::mapping::SoA{array_dims, Particle{}};
+            if constexpr (TMapping == 2)
+                return llama::mapping::SoA<decltype(array_dims), Particle, true>{array_dims};
+            if constexpr (TMapping == 3)
+                return llama::mapping::AoSoA<decltype(array_dims), Particle, TAoSoALanes>{array_dims};
+            if constexpr (TMapping == 4)
                 return llama::mapping::Split<
-                    decltype(arrayDims),
+                    decltype(array_dims),
                     Particle,
                     llama::RecordCoord<1>,
                     llama::mapping::PreconfiguredSoA<>::type,
                     llama::mapping::PreconfiguredSoA<>::type,
-                    true>{arrayDims};
+                    true>{array_dims};
         }();
-        if constexpr (DUMP_MAPPING)
+        if constexpr (dump_mapping)
             std::ofstream(title + ".svg") << llama::toSvg(mapping);
 
         auto tmapping = [&]
         {
-            if constexpr (TRACE)
+            if constexpr (trace)
                 return llama::mapping::Trace{std::move(mapping)};
             else
                 return std::move(mapping);
@@ -151,7 +151,7 @@ namespace usellama
 
         auto hmapping = [&]
         {
-            if constexpr (HEATMAP)
+            if constexpr (heatmap)
                 return llama::mapping::Heatmap{std::move(tmapping)};
             else
                 return std::move(tmapping);
@@ -162,7 +162,7 @@ namespace usellama
 
         std::default_random_engine engine;
         std::normal_distribution<FP> dist(FP(0), FP(1));
-        for (std::size_t i = 0; i < PROBLEM_SIZE; ++i)
+        for (std::size_t i = 0; i < problem_size; ++i)
         {
             auto p = particles(i);
             p(tag::Pos{}, tag::X{}) = dist(engine);
@@ -175,28 +175,28 @@ namespace usellama
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
                 update(particles);
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
             move(particles);
-            sumMove += watch.printAndReset("move");
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
-        if constexpr (HEATMAP)
-            std::ofstream("nbody_heatmap_" + mappingName(Mapping) + ".sh") << particles.mapping.toGnuplotScript();
+        if constexpr (heatmap)
+            std::ofstream("nbody_heatmap_" + mapping_name(TMapping) + ".sh") << particles.mapping.toGnuplotScript();
 
         return 0;
     }
 } // namespace usellama
 
-namespace manualAoS
+namespace manual_ao_s
 {
     struct Vec
     {
@@ -262,26 +262,26 @@ namespace manualAoS
         FP mass;
     };
 
-    inline void pPInteraction(Particle& pi, const Particle& pj)
+    inline void p_p_interaction(Particle& pi, const Particle& pj)
     {
         auto distance = pi.pos - pj.pos;
         distance *= distance;
-        const FP distSqr = EPS2 + distance.x + distance.y + distance.z;
-        const FP distSixth = distSqr * distSqr * distSqr;
-        const FP invDistCube = 1.0f / std::sqrt(distSixth);
-        const FP sts = pj.mass * invDistCube * TIMESTEP;
+        const FP dist_sqr = ep_s2 + distance.x + distance.y + distance.z;
+        const FP dist_sixth = dist_sqr * dist_sqr * dist_sqr;
+        const FP inv_dist_cube = 1.0f / std::sqrt(dist_sixth);
+        const FP sts = pj.mass * inv_dist_cube * timestep;
         pi.vel += distance * sts;
     }
 
     void update(Particle* particles)
     {
         LLAMA_INDEPENDENT_DATA
-        for (std::size_t i = 0; i < PROBLEM_SIZE; i++)
+        for (std::size_t i = 0; i < problem_size; i++)
         {
             Particle pi = particles[i];
             LLAMA_INDEPENDENT_DATA
-            for (std::size_t j = 0; j < PROBLEM_SIZE; ++j)
-                pPInteraction(pi, particles[j]);
+            for (std::size_t j = 0; j < problem_size; ++j)
+                p_p_interaction(pi, particles[j]);
             particles[i].vel = pi.vel;
         }
     }
@@ -289,17 +289,17 @@ namespace manualAoS
     void move(Particle* particles)
     {
         LLAMA_INDEPENDENT_DATA
-        for (std::size_t i = 0; i < PROBLEM_SIZE; i++)
-            particles[i].pos += particles[i].vel * TIMESTEP;
+        for (std::size_t i = 0; i < problem_size; i++)
+            particles[i].pos += particles[i].vel * timestep;
     }
 
-    auto main(std::ostream& plotFile) -> int
+    auto main(std::ostream& plot_file) -> int
     {
         auto title = "AoS"s;
         std::cout << title << "\n";
         Stopwatch watch;
 
-        std::vector<Particle> particles(PROBLEM_SIZE);
+        std::vector<Particle> particles(problem_size);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
@@ -316,27 +316,27 @@ namespace manualAoS
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
                 update(particles.data());
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
             move(particles.data());
-            sumMove += watch.printAndReset("move");
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
 } // namespace manualAoS
 
-namespace manualSoA
+namespace manual_so_a
 {
-    inline void pPInteraction(
+    inline void p_p_interaction(
         FP piposx,
         FP piposy,
         FP piposz,
@@ -354,10 +354,10 @@ namespace manualSoA
         xdistance *= xdistance;
         ydistance *= ydistance;
         zdistance *= zdistance;
-        const FP distSqr = EPS2 + xdistance + ydistance + zdistance;
-        const FP distSixth = distSqr * distSqr * distSqr;
-        const FP invDistCube = 1.0f / std::sqrt(distSixth);
-        const FP sts = pjmass * invDistCube * TIMESTEP;
+        const FP dist_sqr = ep_s2 + xdistance + ydistance + zdistance;
+        const FP dist_sixth = dist_sqr * dist_sqr * dist_sqr;
+        const FP inv_dist_cube = 1.0f / std::sqrt(dist_sixth);
+        const FP sts = pjmass * inv_dist_cube * timestep;
         pivelx += xdistance * sts;
         pively += ydistance * sts;
         pivelz += zdistance * sts;
@@ -366,7 +366,7 @@ namespace manualSoA
     void update(FP* posx, FP* posy, FP* posz, FP* velx, FP* vely, FP* velz, FP* mass)
     {
         LLAMA_INDEPENDENT_DATA
-        for (std::size_t i = 0; i < PROBLEM_SIZE; i++)
+        for (std::size_t i = 0; i < problem_size; i++)
         {
             const FP piposx = posx[i];
             const FP piposy = posy[i];
@@ -374,8 +374,8 @@ namespace manualSoA
             FP pivelx = velx[i];
             FP pively = vely[i];
             FP pivelz = velz[i];
-            for (std::size_t j = 0; j < PROBLEM_SIZE; ++j)
-                pPInteraction(piposx, piposy, piposz, pivelx, pively, pivelz, posx[j], posy[j], posz[j], mass[j]);
+            for (std::size_t j = 0; j < problem_size; ++j)
+                p_p_interaction(piposx, piposy, piposz, pivelx, pively, pivelz, posx[j], posy[j], posz[j], mass[j]);
             velx[i] = pivelx;
             vely[i] = pively;
             velz[i] = pivelz;
@@ -385,33 +385,33 @@ namespace manualSoA
     void move(FP* posx, FP* posy, FP* posz, const FP* velx, const FP* vely, const FP* velz)
     {
         LLAMA_INDEPENDENT_DATA
-        for (std::size_t i = 0; i < PROBLEM_SIZE; i++)
+        for (std::size_t i = 0; i < problem_size; i++)
         {
-            posx[i] += velx[i] * TIMESTEP;
-            posy[i] += vely[i] * TIMESTEP;
-            posz[i] += velz[i] * TIMESTEP;
+            posx[i] += velx[i] * timestep;
+            posy[i] += vely[i] * timestep;
+            posz[i] += velz[i] * timestep;
         }
     }
 
-    auto main(std::ostream& plotFile) -> int
+    auto main(std::ostream& plot_file) -> int
     {
         auto title = "SoA"s;
         std::cout << title << "\n";
         Stopwatch watch;
 
         using Vector = std::vector<FP, llama::bloballoc::AlignedAllocator<FP, 64>>;
-        Vector posx(PROBLEM_SIZE);
-        Vector posy(PROBLEM_SIZE);
-        Vector posz(PROBLEM_SIZE);
-        Vector velx(PROBLEM_SIZE);
-        Vector vely(PROBLEM_SIZE);
-        Vector velz(PROBLEM_SIZE);
-        Vector mass(PROBLEM_SIZE);
+        Vector posx(problem_size);
+        Vector posy(problem_size);
+        Vector posz(problem_size);
+        Vector velx(problem_size);
+        Vector vely(problem_size);
+        Vector velz(problem_size);
+        Vector mass(problem_size);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
         std::normal_distribution<FP> dist(FP(0), FP(1));
-        for (std::size_t i = 0; i < PROBLEM_SIZE; ++i)
+        for (std::size_t i = 0; i < problem_size; ++i)
         {
             posx[i] = dist(engine);
             posy[i] = dist(engine);
@@ -423,45 +423,45 @@ namespace manualSoA
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
                 update(posx.data(), posy.data(), posz.data(), velx.data(), vely.data(), velz.data(), mass.data());
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
             move(posx.data(), posy.data(), posz.data(), velx.data(), vely.data(), velz.data());
-            sumMove += watch.printAndReset("move");
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
 } // namespace manualSoA
 
-namespace manualAoSoA
+namespace manual_ao_so_a
 {
-    template <std::size_t Lanes>
+    template <std::size_t TLanes>
     struct alignas(64) ParticleBlock
     {
         struct
         {
-            FP x[Lanes];
-            FP y[Lanes];
-            FP z[Lanes];
+            FP x[TLanes];
+            FP y[TLanes];
+            FP z[TLanes];
         } pos;
         struct
         {
-            FP x[Lanes];
-            FP y[Lanes];
-            FP z[Lanes];
+            FP x[TLanes];
+            FP y[TLanes];
+            FP z[TLanes];
         } vel;
-        FP mass[Lanes];
+        FP mass[TLanes];
     };
 
-    inline void pPInteraction(
+    inline void p_p_interaction(
         FP piposx,
         FP piposy,
         FP piposz,
@@ -479,111 +479,111 @@ namespace manualAoSoA
         xdistance *= xdistance;
         ydistance *= ydistance;
         zdistance *= zdistance;
-        const FP distSqr = EPS2 + xdistance + ydistance + zdistance;
-        const FP distSixth = distSqr * distSqr * distSqr;
-        const FP invDistCube = 1.0f / std::sqrt(distSixth);
-        const FP sts = pjmass * invDistCube * TIMESTEP;
+        const FP dist_sqr = ep_s2 + xdistance + ydistance + zdistance;
+        const FP dist_sixth = dist_sqr * dist_sqr * dist_sqr;
+        const FP inv_dist_cube = 1.0f / std::sqrt(dist_sixth);
+        const FP sts = pjmass * inv_dist_cube * timestep;
         pivelx += xdistance * sts;
         pively += ydistance * sts;
         pivelz += zdistance * sts;
     }
 
-    template <std::size_t Lanes>
-    void update(ParticleBlock<Lanes>* particles)
+    template <std::size_t TLanes>
+    void update(ParticleBlock<TLanes>* particles)
     {
-        constexpr auto blocks = PROBLEM_SIZE / Lanes;
+        constexpr auto blocks = problem_size / TLanes;
         for (std::size_t bi = 0; bi < blocks; bi++)
         {
-            auto blockI = particles[bi];
+            auto block_i = particles[bi];
             for (std::size_t bj = 0; bj < blocks; bj++)
-                for (std::size_t j = 0; j < Lanes; j++)
+                for (std::size_t j = 0; j < TLanes; j++)
                 {
                     LLAMA_INDEPENDENT_DATA
-                    for (std::size_t i = 0; i < Lanes; i++)
+                    for (std::size_t i = 0; i < TLanes; i++)
                     {
-                        const auto& blockJ = particles[bj];
-                        pPInteraction(
-                            blockI.pos.x[i],
-                            blockI.pos.y[i],
-                            blockI.pos.z[i],
-                            blockI.vel.x[i],
-                            blockI.vel.y[i],
-                            blockI.vel.z[i],
-                            blockJ.pos.x[j],
-                            blockJ.pos.y[j],
-                            blockJ.pos.z[j],
-                            blockJ.mass[j]);
+                        const auto& block_j = particles[bj];
+                        p_p_interaction(
+                            block_i.pos.x[i],
+                            block_i.pos.y[i],
+                            block_i.pos.z[i],
+                            block_i.vel.x[i],
+                            block_i.vel.y[i],
+                            block_i.vel.z[i],
+                            block_j.pos.x[j],
+                            block_j.pos.y[j],
+                            block_j.pos.z[j],
+                            block_j.mass[j]);
                     }
                 }
 
-            particles[bi].vel = blockI.vel;
+            particles[bi].vel = block_i.vel;
         }
     }
 
-    template <std::size_t Lanes>
-    void updateTiled(ParticleBlock<Lanes>* particles)
+    template <std::size_t TLanes>
+    void update_tiled(ParticleBlock<TLanes>* particles)
     {
-        constexpr auto blocks = PROBLEM_SIZE / Lanes;
-        constexpr auto blocksPerTile = 128; // L1D_SIZE / sizeof(ParticleBlock<Lanes>);
-        static_assert(blocks % blocksPerTile == 0);
-        for (std::size_t ti = 0; ti < blocks / blocksPerTile; ti++)
-            for (std::size_t tj = 0; tj < blocks / blocksPerTile; tj++)
-                for (std::size_t bi = 0; bi < blocksPerTile; bi++)
+        constexpr auto blocks = problem_size / TLanes;
+        constexpr auto blocks_per_tile = 128; // L1D_SIZE / sizeof(ParticleBlock<Lanes>);
+        static_assert(blocks % blocks_per_tile == 0);
+        for (std::size_t ti = 0; ti < blocks / blocks_per_tile; ti++)
+            for (std::size_t tj = 0; tj < blocks / blocks_per_tile; tj++)
+                for (std::size_t bi = 0; bi < blocks_per_tile; bi++)
                 {
-                    auto blockI = particles[ti * blocksPerTile + bi];
-                    for (std::size_t bj = 0; bj < blocksPerTile; bj++)
-                        for (std::size_t j = 0; j < Lanes; j++)
+                    auto block_i = particles[ti * blocks_per_tile + bi];
+                    for (std::size_t bj = 0; bj < blocks_per_tile; bj++)
+                        for (std::size_t j = 0; j < TLanes; j++)
                         {
                             LLAMA_INDEPENDENT_DATA
-                            for (std::size_t i = 0; i < Lanes; i++)
+                            for (std::size_t i = 0; i < TLanes; i++)
                             {
-                                const auto& blockJ = particles[tj * blocksPerTile + bj];
-                                pPInteraction(
-                                    blockI.pos.x[i],
-                                    blockI.pos.y[i],
-                                    blockI.pos.z[i],
-                                    blockI.vel.x[i],
-                                    blockI.vel.y[i],
-                                    blockI.vel.z[i],
-                                    blockJ.pos.x[j],
-                                    blockJ.pos.y[j],
-                                    blockJ.pos.z[j],
-                                    blockJ.mass[j]);
+                                const auto& block_j = particles[tj * blocks_per_tile + bj];
+                                p_p_interaction(
+                                    block_i.pos.x[i],
+                                    block_i.pos.y[i],
+                                    block_i.pos.z[i],
+                                    block_i.vel.x[i],
+                                    block_i.vel.y[i],
+                                    block_i.vel.z[i],
+                                    block_j.pos.x[j],
+                                    block_j.pos.y[j],
+                                    block_j.pos.z[j],
+                                    block_j.mass[j]);
                             }
                         }
-                    particles[bi].vel = blockI.vel;
+                    particles[bi].vel = block_i.vel;
                 }
     }
 
-    template <std::size_t Lanes>
-    void move(ParticleBlock<Lanes>* particles)
+    template <std::size_t TLanes>
+    void move(ParticleBlock<TLanes>* particles)
     {
-        constexpr auto blocks = PROBLEM_SIZE / Lanes;
+        constexpr auto blocks = problem_size / TLanes;
         for (std::size_t bi = 0; bi < blocks; bi++)
         {
             LLAMA_INDEPENDENT_DATA
-            for (std::size_t i = 0; i < Lanes; ++i)
+            for (std::size_t i = 0; i < TLanes; ++i)
             {
                 auto& block = particles[bi];
-                block.pos.x[i] += block.vel.x[i] * TIMESTEP;
-                block.pos.y[i] += block.vel.y[i] * TIMESTEP;
-                block.pos.z[i] += block.vel.z[i] * TIMESTEP;
+                block.pos.x[i] += block.vel.x[i] * timestep;
+                block.pos.y[i] += block.vel.y[i] * timestep;
+                block.pos.z[i] += block.vel.z[i] * timestep;
             }
         }
     }
 
-    template <std::size_t Lanes>
-    auto main(std::ostream& plotFile, bool tiled) -> int
+    template <std::size_t TLanes>
+    auto main(std::ostream& plot_file, bool tiled) -> int
     {
-        auto title = "AoSoA" + std::to_string(Lanes);
+        auto title = "AoSoA" + std::to_string(TLanes);
         if (tiled)
             title += " tiled";
         std::cout << title << "\n";
         Stopwatch watch;
 
-        constexpr auto blocks = PROBLEM_SIZE / Lanes;
+        constexpr auto blocks = problem_size / TLanes;
 
-        std::vector<ParticleBlock<Lanes>> particles(blocks);
+        std::vector<ParticleBlock<TLanes>> particles(blocks);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
@@ -591,7 +591,7 @@ namespace manualAoSoA
         for (std::size_t bi = 0; bi < blocks; ++bi)
         {
             auto& block = particles[bi];
-            for (std::size_t i = 0; i < Lanes; ++i)
+            for (std::size_t i = 0; i < TLanes; ++i)
             {
                 block.pos.x[i] = dist(engine);
                 block.pos.y[i] = dist(engine);
@@ -604,22 +604,22 @@ namespace manualAoSoA
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
                 if (tiled)
-                    updateTiled(particles.data());
+                    update_tiled(particles.data());
                 else
                     update(particles.data());
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
             move(particles.data());
-            sumMove += watch.printAndReset("move");
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
@@ -628,33 +628,33 @@ namespace manualAoSoA
 #ifdef __AVX2__
 #    include <immintrin.h>
 
-namespace manualAoSoA_manualAVX
+namespace manual_ao_so_a_manual_avx
 {
     // hard coded to AVX2 register length, should be 8
-    constexpr auto LANES = sizeof(__m256) / sizeof(float);
+    constexpr auto lanes = sizeof(__m256) / sizeof(float);
 
     struct alignas(32) ParticleBlock
     {
         struct
         {
-            float x[LANES];
-            float y[LANES];
-            float z[LANES];
+            float x[lanes];
+            float y[lanes];
+            float z[lanes];
         } pos;
         struct
         {
-            float x[LANES];
-            float y[LANES];
-            float z[LANES];
+            float x[lanes];
+            float y[lanes];
+            float z[lanes];
         } vel;
-        float mass[LANES];
+        float mass[lanes];
     };
 
-    constexpr auto BLOCKS = PROBLEM_SIZE / LANES;
-    const __m256 vEPS2 = _mm256_set1_ps(EPS2); // NOLINT(cert-err58-cpp)
-    const __m256 vTIMESTEP = _mm256_set1_ps(TIMESTEP); // NOLINT(cert-err58-cpp)
+    constexpr auto blocks = problem_size / lanes;
+    const __m256 v_ep_s2 = _mm256_set1_ps(ep_s2); // NOLINT(cert-err58-cpp)
+    const __m256 v_timestep = _mm256_set1_ps(timestep); // NOLINT(cert-err58-cpp)
 
-    inline void pPInteraction(
+    inline void p_p_interaction(
         __m256 piposx,
         __m256 piposy,
         __m256 piposz,
@@ -669,68 +669,68 @@ namespace manualAoSoA_manualAVX
         const __m256 xdistance = _mm256_sub_ps(piposx, pjposx);
         const __m256 ydistance = _mm256_sub_ps(piposy, pjposy);
         const __m256 zdistance = _mm256_sub_ps(piposz, pjposz);
-        const __m256 xdistanceSqr = _mm256_mul_ps(xdistance, xdistance);
-        const __m256 ydistanceSqr = _mm256_mul_ps(ydistance, ydistance);
-        const __m256 zdistanceSqr = _mm256_mul_ps(zdistance, zdistance);
-        const __m256 distSqr
-            = _mm256_add_ps(_mm256_add_ps(_mm256_add_ps(vEPS2, xdistanceSqr), ydistanceSqr), zdistanceSqr);
-        const __m256 distSixth = _mm256_mul_ps(_mm256_mul_ps(distSqr, distSqr), distSqr);
-        const __m256 invDistCube = [&]
+        const __m256 xdistance_sqr = _mm256_mul_ps(xdistance, xdistance);
+        const __m256 ydistance_sqr = _mm256_mul_ps(ydistance, ydistance);
+        const __m256 zdistance_sqr = _mm256_mul_ps(zdistance, zdistance);
+        const __m256 dist_sqr
+            = _mm256_add_ps(_mm256_add_ps(_mm256_add_ps(v_ep_s2, xdistance_sqr), ydistance_sqr), zdistance_sqr);
+        const __m256 dist_sixth = _mm256_mul_ps(_mm256_mul_ps(dist_sqr, dist_sqr), dist_sqr);
+        const __m256 inv_dist_cube = [dist_sixth]
         {
-            if constexpr (ALLOW_RSQRT)
+            if constexpr (allow_rsqrt)
             {
-                const __m256 r = _mm256_rsqrt_ps(distSixth);
-                if constexpr (NEWTON_RAPHSON_AFTER_RSQRT)
+                const __m256 r = _mm256_rsqrt_ps(dist_sixth);
+                if constexpr (newton_raphson_after_rsqrt)
                 {
                     // from: http://stackoverflow.com/q/14752399/556899
                     const __m256 three = _mm256_set1_ps(3.0f);
                     const __m256 half = _mm256_set1_ps(0.5f);
-                    const __m256 muls = _mm256_mul_ps(_mm256_mul_ps(distSixth, r), r);
+                    const __m256 muls = _mm256_mul_ps(_mm256_mul_ps(dist_sixth, r), r);
                     return _mm256_mul_ps(_mm256_mul_ps(half, r), _mm256_sub_ps(three, muls));
                 }
                 else
                     return r;
             }
             else
-                return _mm256_div_ps(_mm256_set1_ps(1.0f), _mm256_sqrt_ps(distSixth));
+                return _mm256_div_ps(_mm256_set1_ps(1.0f), _mm256_sqrt_ps(dist_sixth));
         }();
-        const __m256 sts = _mm256_mul_ps(_mm256_mul_ps(pjmass, invDistCube), vTIMESTEP);
-        pivelx = _mm256_fmadd_ps(xdistanceSqr, sts, pivelx);
-        pively = _mm256_fmadd_ps(ydistanceSqr, sts, pively);
-        pivelz = _mm256_fmadd_ps(zdistanceSqr, sts, pivelz);
+        const __m256 sts = _mm256_mul_ps(_mm256_mul_ps(pjmass, inv_dist_cube), v_timestep);
+        pivelx = _mm256_fmadd_ps(xdistance_sqr, sts, pivelx);
+        pively = _mm256_fmadd_ps(ydistance_sqr, sts, pively);
+        pivelz = _mm256_fmadd_ps(zdistance_sqr, sts, pivelz);
     }
 
     // update (read/write) 8 particles I based on the influence of 1 particle J
     void update8(ParticleBlock* particles)
     {
-        for (std::size_t bi = 0; bi < BLOCKS; bi++)
+        for (std::size_t bi = 0; bi < blocks; bi++)
         {
-            auto& blockI = particles[bi];
-            const __m256 piposx = _mm256_load_ps(&blockI.pos.x[0]);
-            const __m256 piposy = _mm256_load_ps(&blockI.pos.y[0]);
-            const __m256 piposz = _mm256_load_ps(&blockI.pos.z[0]);
-            __m256 pivelx = _mm256_load_ps(&blockI.vel.x[0]);
-            __m256 pively = _mm256_load_ps(&blockI.vel.y[0]);
-            __m256 pivelz = _mm256_load_ps(&blockI.vel.z[0]);
+            auto& block_i = particles[bi];
+            const __m256 piposx = _mm256_load_ps(&block_i.pos.x[0]);
+            const __m256 piposy = _mm256_load_ps(&block_i.pos.y[0]);
+            const __m256 piposz = _mm256_load_ps(&block_i.pos.z[0]);
+            __m256 pivelx = _mm256_load_ps(&block_i.vel.x[0]);
+            __m256 pively = _mm256_load_ps(&block_i.vel.y[0]);
+            __m256 pivelz = _mm256_load_ps(&block_i.vel.z[0]);
 
-            for (std::size_t bj = 0; bj < BLOCKS; bj++)
-                for (std::size_t j = 0; j < LANES; j++)
+            for (std::size_t bj = 0; bj < blocks; bj++)
+                for (std::size_t j = 0; j < lanes; j++)
                 {
-                    const auto& blockJ = particles[bj];
-                    const __m256 posxJ = _mm256_broadcast_ss(&blockJ.pos.x[j]);
-                    const __m256 posyJ = _mm256_broadcast_ss(&blockJ.pos.y[j]);
-                    const __m256 poszJ = _mm256_broadcast_ss(&blockJ.pos.z[j]);
-                    const __m256 massJ = _mm256_broadcast_ss(&blockJ.mass[j]);
-                    pPInteraction(piposx, piposy, piposz, pivelx, pively, pivelz, posxJ, posyJ, poszJ, massJ);
+                    const auto& block_j = particles[bj];
+                    const __m256 posx_j = _mm256_broadcast_ss(&block_j.pos.x[j]);
+                    const __m256 posy_j = _mm256_broadcast_ss(&block_j.pos.y[j]);
+                    const __m256 posz_j = _mm256_broadcast_ss(&block_j.pos.z[j]);
+                    const __m256 mass_j = _mm256_broadcast_ss(&block_j.mass[j]);
+                    p_p_interaction(piposx, piposy, piposz, pivelx, pively, pivelz, posx_j, posy_j, posz_j, mass_j);
                 }
 
-            _mm256_store_ps(&blockI.vel.x[0], pivelx);
-            _mm256_store_ps(&blockI.vel.y[0], pively);
-            _mm256_store_ps(&blockI.vel.z[0], pivelz);
+            _mm256_store_ps(&block_i.vel.x[0], pivelx);
+            _mm256_store_ps(&block_i.vel.y[0], pively);
+            _mm256_store_ps(&block_i.vel.z[0], pivelz);
         }
     }
 
-    inline auto horizontalSum(__m256 v) -> float
+    inline auto horizontal_sum(__m256 v) -> float
     {
         // from:
         // http://jtdz-solenoids.com/stackoverflow_/questions/13879609/horizontal-sum-of-8-packed-32bit-floats/18616679#18616679
@@ -748,65 +748,65 @@ namespace manualAoSoA_manualAVX
     // update (read/write) 1 particles I based on the influence of 8 particles J with accumulator
     void update1(ParticleBlock* particles)
     {
-        for (std::size_t bi = 0; bi < BLOCKS; bi++)
-            for (std::size_t i = 0; i < LANES; i++)
+        for (std::size_t bi = 0; bi < blocks; bi++)
+            for (std::size_t i = 0; i < lanes; i++)
             {
-                auto& blockI = particles[bi];
-                const __m256 piposx = _mm256_broadcast_ss(&blockI.pos.x[i]);
-                const __m256 piposy = _mm256_broadcast_ss(&blockI.pos.y[i]);
-                const __m256 piposz = _mm256_broadcast_ss(&blockI.pos.z[i]);
-                __m256 pivelx = _mm256_broadcast_ss(&blockI.vel.x[i]);
-                __m256 pively = _mm256_broadcast_ss(&blockI.vel.y[i]);
-                __m256 pivelz = _mm256_broadcast_ss(&blockI.vel.z[i]);
+                auto& block_i = particles[bi];
+                const __m256 piposx = _mm256_broadcast_ss(&block_i.pos.x[i]);
+                const __m256 piposy = _mm256_broadcast_ss(&block_i.pos.y[i]);
+                const __m256 piposz = _mm256_broadcast_ss(&block_i.pos.z[i]);
+                __m256 pivelx = _mm256_broadcast_ss(&block_i.vel.x[i]);
+                __m256 pively = _mm256_broadcast_ss(&block_i.vel.y[i]);
+                __m256 pivelz = _mm256_broadcast_ss(&block_i.vel.z[i]);
 
-                for (std::size_t bj = 0; bj < BLOCKS; bj++)
+                for (std::size_t bj = 0; bj < blocks; bj++)
                 {
-                    const auto& blockJ = particles[bj];
-                    const __m256 pjposx = _mm256_load_ps(&blockJ.pos.x[0]);
-                    const __m256 pjposy = _mm256_load_ps(&blockJ.pos.y[0]);
-                    const __m256 pjposz = _mm256_load_ps(&blockJ.pos.z[0]);
-                    const __m256 pjmass = _mm256_load_ps(&blockJ.mass[0]);
-                    pPInteraction(piposx, piposy, piposz, pivelx, pively, pivelz, pjposx, pjposy, pjposz, pjmass);
+                    const auto& block_j = particles[bj];
+                    const __m256 pjposx = _mm256_load_ps(&block_j.pos.x[0]);
+                    const __m256 pjposy = _mm256_load_ps(&block_j.pos.y[0]);
+                    const __m256 pjposz = _mm256_load_ps(&block_j.pos.z[0]);
+                    const __m256 pjmass = _mm256_load_ps(&block_j.mass[0]);
+                    p_p_interaction(piposx, piposy, piposz, pivelx, pively, pivelz, pjposx, pjposy, pjposz, pjmass);
                 }
 
-                blockI.vel.x[i] = horizontalSum(pivelx);
-                blockI.vel.y[i] = horizontalSum(pively);
-                blockI.vel.z[i] = horizontalSum(pivelz);
+                block_i.vel.x[i] = horizontal_sum(pivelx);
+                block_i.vel.y[i] = horizontal_sum(pively);
+                block_i.vel.z[i] = horizontal_sum(pivelz);
             }
     }
 
     void move(ParticleBlock* particles)
     {
-        for (std::size_t bi = 0; bi < BLOCKS; bi++)
+        for (std::size_t bi = 0; bi < blocks; bi++)
         {
             auto& block = particles[bi];
             _mm256_store_ps(
                 &block.pos.x[0],
-                _mm256_fmadd_ps(_mm256_load_ps(&block.vel.x[0]), vTIMESTEP, _mm256_load_ps(&block.pos.x[0])));
+                _mm256_fmadd_ps(_mm256_load_ps(&block.vel.x[0]), v_timestep, _mm256_load_ps(&block.pos.x[0])));
             _mm256_store_ps(
                 &block.pos.y[0],
-                _mm256_fmadd_ps(_mm256_load_ps(&block.vel.y[0]), vTIMESTEP, _mm256_load_ps(&block.pos.y[0])));
+                _mm256_fmadd_ps(_mm256_load_ps(&block.vel.y[0]), v_timestep, _mm256_load_ps(&block.pos.y[0])));
             _mm256_store_ps(
                 &block.pos.z[0],
-                _mm256_fmadd_ps(_mm256_load_ps(&block.vel.z[0]), vTIMESTEP, _mm256_load_ps(&block.pos.z[0])));
+                _mm256_fmadd_ps(_mm256_load_ps(&block.vel.z[0]), v_timestep, _mm256_load_ps(&block.pos.z[0])));
         }
     }
 
-    auto main(std::ostream& plotFile, bool useUpdate1) -> int
+    auto main(std::ostream& plot_file, bool use_update1) -> int
     {
-        auto title = "AoSoA" + std::to_string(LANES) + " AVX2 " + (useUpdate1 ? "w1r8" : "w8r1"); // NOLINT
+        auto title = "AoSoA" + std::to_string(lanes) + " AVX2 " + (use_update1 ? "w1r8" : "w8r1"); // NOLINT
         std::cout << title << '\n';
         Stopwatch watch;
 
-        std::vector<ParticleBlock> particles(BLOCKS);
+        std::vector<ParticleBlock> particles(blocks);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
         std::normal_distribution<FP> dist(FP(0), FP(1));
-        for (std::size_t bi = 0; bi < BLOCKS; ++bi)
+        for (std::size_t bi = 0; bi < blocks; ++bi)
         {
             auto& block = particles[bi];
-            for (std::size_t i = 0; i < LANES; ++i)
+            for (std::size_t i = 0; i < lanes; ++i)
             {
                 block.pos.x[i] = dist(engine);
                 block.pos.y[i] = dist(engine);
@@ -819,22 +819,22 @@ namespace manualAoSoA_manualAVX
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
-                if (useUpdate1)
+                if (use_update1)
                     update1(particles.data());
                 else
                     update8(particles.data());
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
             move(particles.data());
-            sumMove += watch.printAndReset("move");
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
@@ -844,134 +844,134 @@ namespace manualAoSoA_manualAVX
 #if __has_include(<Vc/Vc>)
 #    include <Vc/Vc>
 
-namespace manualAoSoA_Vc
+namespace manual_ao_so_a_vc
 {
-    template <typename vec>
+    template <typename TVec>
     struct alignas(32) ParticleBlock
     {
         struct
         {
-            vec x;
-            vec y;
-            vec z;
+            TVec x;
+            TVec y;
+            TVec z;
         } pos, vel;
-        vec mass;
+        TVec mass;
     };
 
 
-    template <typename vec>
-    inline void pPInteraction(
-        vec piposx,
-        vec piposy,
-        vec piposz,
-        vec& pivelx,
-        vec& pively,
-        vec& pivelz,
-        vec pjposx,
-        vec pjposy,
-        vec pjposz,
-        vec pjmass)
+    template <typename TVec>
+    inline void p_p_interaction(
+        TVec piposx,
+        TVec piposy,
+        TVec piposz,
+        TVec& pivelx,
+        TVec& pively,
+        TVec& pivelz,
+        TVec pjposx,
+        TVec pjposy,
+        TVec pjposz,
+        TVec pjmass)
     {
-        const vec xdistance = piposx - pjposx;
-        const vec ydistance = piposy - pjposy;
-        const vec zdistance = piposz - pjposz;
-        const vec xdistanceSqr = xdistance * xdistance;
-        const vec ydistanceSqr = ydistance * ydistance;
-        const vec zdistanceSqr = zdistance * zdistance;
-        const vec distSqr = EPS2 + xdistanceSqr + ydistanceSqr + zdistanceSqr;
-        const vec distSixth = distSqr * distSqr * distSqr;
-        const vec invDistCube = [&]
+        const TVec xdistance = piposx - pjposx;
+        const TVec ydistance = piposy - pjposy;
+        const TVec zdistance = piposz - pjposz;
+        const TVec xdistance_sqr = xdistance * xdistance;
+        const TVec ydistance_sqr = ydistance * ydistance;
+        const TVec zdistance_sqr = zdistance * zdistance;
+        const TVec dist_sqr = ep_s2 + xdistance_sqr + ydistance_sqr + zdistance_sqr;
+        const TVec dist_sixth = dist_sqr * dist_sqr * dist_sqr;
+        const TVec inv_dist_cube = [dist_sixth]
         {
-            if constexpr (ALLOW_RSQRT)
+            if constexpr (allow_rsqrt)
             {
-                const vec r = Vc::rsqrt(distSixth);
-                if constexpr (NEWTON_RAPHSON_AFTER_RSQRT)
+                const TVec r = Vc::rsqrt(dist_sixth);
+                if constexpr (newton_raphson_after_rsqrt)
                 {
                     // from: http://stackoverflow.com/q/14752399/556899
-                    const vec three = 3.0f;
-                    const vec half = 0.5f;
-                    const vec muls = distSixth * r * r;
+                    const TVec three = 3.0f;
+                    const TVec half = 0.5f;
+                    const TVec muls = dist_sixth * r * r;
                     return (half * r) * (three - muls);
                 }
                 else
                     return r;
             }
             else
-                return 1.0f / Vc::sqrt(distSixth);
+                return 1.0f / Vc::sqrt(dist_sixth);
         }();
-        const vec sts = pjmass * invDistCube * TIMESTEP;
-        pivelx = xdistanceSqr * sts + pivelx;
-        pively = ydistanceSqr * sts + pively;
-        pivelz = zdistanceSqr * sts + pivelz;
+        const TVec sts = pjmass * inv_dist_cube * timestep;
+        pivelx = xdistance_sqr * sts + pivelx;
+        pively = ydistance_sqr * sts + pively;
+        pivelz = zdistance_sqr * sts + pivelz;
     }
 
-    template <typename vec>
-    void update8(ParticleBlock<vec>* particles, int threads)
+    template <typename TVec>
+    void update8(ParticleBlock<TVec>* particles, int threads)
     {
-        constexpr auto LANES = vec::size();
-        constexpr auto BLOCKS = PROBLEM_SIZE / LANES;
+        constexpr auto lanes = TVec::size();
+        constexpr auto blocks = problem_size / lanes;
 
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t bi = 0; bi < BLOCKS; bi++)
+        for (std::ptrdiff_t bi = 0; bi < blocks; bi++)
         {
-            auto& blockI = particles[bi];
+            auto& block_i = particles[bi];
             // std::for_each(ex, particles, particles + BLOCKS, [&](ParticleBlock& blockI) {
-            const vec piposx = blockI.pos.x;
-            const vec piposy = blockI.pos.y;
-            const vec piposz = blockI.pos.z;
-            vec pivelx = blockI.vel.x;
-            vec pively = blockI.vel.y;
-            vec pivelz = blockI.vel.z;
+            const TVec piposx = block_i.pos.x;
+            const TVec piposy = block_i.pos.y;
+            const TVec piposz = block_i.pos.z;
+            TVec pivelx = block_i.vel.x;
+            TVec pively = block_i.vel.y;
+            TVec pivelz = block_i.vel.z;
 
-            for (std::size_t bj = 0; bj < BLOCKS; bj++)
-                for (std::size_t j = 0; j < LANES; j++)
+            for (std::size_t bj = 0; bj < blocks; bj++)
+                for (std::size_t j = 0; j < lanes; j++)
                 {
-                    const auto& blockJ = particles[bj];
-                    const vec pjposx = blockJ.pos.x[j];
-                    const vec pjposy = blockJ.pos.y[j];
-                    const vec pjposz = blockJ.pos.z[j];
-                    const vec pjmass = blockJ.mass[j];
+                    const auto& block_j = particles[bj];
+                    const TVec pjposx = block_j.pos.x[j];
+                    const TVec pjposy = block_j.pos.y[j];
+                    const TVec pjposz = block_j.pos.z[j];
+                    const TVec pjmass = block_j.mass[j];
 
-                    pPInteraction(piposx, piposy, piposz, pivelx, pively, pivelz, pjposx, pjposy, pjposz, pjmass);
+                    p_p_interaction(piposx, piposy, piposz, pivelx, pively, pivelz, pjposx, pjposy, pjposz, pjmass);
                 }
 
-            blockI.vel.x = pivelx;
-            blockI.vel.y = pively;
-            blockI.vel.z = pivelz;
+            block_i.vel.x = pivelx;
+            block_i.vel.y = pively;
+            block_i.vel.z = pivelz;
             // });
         }
     }
 
-    template <typename vec>
-    void update8Tiled(ParticleBlock<vec>* particles, int threads)
+    template <typename TVec>
+    void update8_tiled(ParticleBlock<TVec>* particles, int threads)
     {
-        constexpr auto LANES = vec::size();
-        constexpr auto BLOCKS = PROBLEM_SIZE / LANES;
+        constexpr auto lanes = TVec::size();
+        constexpr auto blocks = problem_size / lanes;
 
-        constexpr auto blocksPerTile = 128; // L1D_SIZE / sizeof(ParticleBlock);
-        static_assert(BLOCKS % blocksPerTile == 0);
+        constexpr auto blocks_per_tile = 128; // L1D_SIZE / sizeof(ParticleBlock);
+        static_assert(blocks % blocks_per_tile == 0);
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t ti = 0; ti < BLOCKS / blocksPerTile; ti++)
-            for (std::size_t bi = 0; bi < blocksPerTile; bi++)
+        for (std::ptrdiff_t ti = 0; ti < blocks / blocks_per_tile; ti++)
+            for (std::size_t bi = 0; bi < blocks_per_tile; bi++)
             {
-                auto& blockI = particles[bi];
-                const vec piposx = blockI.pos.x;
-                const vec piposy = blockI.pos.y;
-                const vec piposz = blockI.pos.z;
-                vec pivelx = blockI.vel.x;
-                vec pively = blockI.vel.y;
-                vec pivelz = blockI.vel.z;
-                for (std::size_t tj = 0; tj < BLOCKS / blocksPerTile; tj++)
-                    for (std::size_t bj = 0; bj < blocksPerTile; bj++)
-                        for (std::size_t j = 0; j < LANES; j++)
+                auto& block_i = particles[bi];
+                const TVec piposx = block_i.pos.x;
+                const TVec piposy = block_i.pos.y;
+                const TVec piposz = block_i.pos.z;
+                TVec pivelx = block_i.vel.x;
+                TVec pively = block_i.vel.y;
+                TVec pivelz = block_i.vel.z;
+                for (std::size_t tj = 0; tj < blocks / blocks_per_tile; tj++)
+                    for (std::size_t bj = 0; bj < blocks_per_tile; bj++)
+                        for (std::size_t j = 0; j < lanes; j++)
                         {
-                            const auto& blockJ = particles[bj];
-                            const vec pjposx = blockJ.pos.x[j];
-                            const vec pjposy = blockJ.pos.y[j];
-                            const vec pjposz = blockJ.pos.z[j];
-                            const vec pjmass = blockJ.mass[j];
+                            const auto& block_j = particles[bj];
+                            const TVec pjposx = block_j.pos.x[j];
+                            const TVec pjposy = block_j.pos.y[j];
+                            const TVec pjposz = block_j.pos.z[j];
+                            const TVec pjmass = block_j.mass[j];
 
-                            pPInteraction(
+                            p_p_interaction(
                                 piposx,
                                 piposy,
                                 piposz,
@@ -984,77 +984,77 @@ namespace manualAoSoA_Vc
                                 pjmass);
                         }
 
-                blockI.vel.x = pivelx;
-                blockI.vel.y = pively;
-                blockI.vel.z = pivelz;
+                block_i.vel.x = pivelx;
+                block_i.vel.y = pively;
+                block_i.vel.z = pivelz;
             }
     }
 
-    template <typename vec>
-    void update1(ParticleBlock<vec>* particles, int threads)
+    template <typename TVec>
+    void update1(ParticleBlock<TVec>* particles, int threads)
     {
-        constexpr auto LANES = vec::size();
-        constexpr auto BLOCKS = PROBLEM_SIZE / LANES;
+        constexpr auto lanes = TVec::size();
+        constexpr auto blocks = problem_size / lanes;
 
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t bi = 0; bi < BLOCKS; bi++)
+        for (std::ptrdiff_t bi = 0; bi < blocks; bi++)
         {
-            auto& blockI = particles[bi];
+            auto& block_i = particles[bi];
             // std::for_each(ex, particles, particles + BLOCKS, [&](ParticleBlock& blockI) {
-            for (std::size_t i = 0; i < LANES; i++)
+            for (std::size_t i = 0; i < lanes; i++)
             {
-                const vec piposx = static_cast<FP>(blockI.pos.x[i]);
-                const vec piposy = static_cast<FP>(blockI.pos.y[i]);
-                const vec piposz = static_cast<FP>(blockI.pos.z[i]);
-                vec pivelx = static_cast<FP>(blockI.vel.x[i]);
-                vec pively = static_cast<FP>(blockI.vel.y[i]);
-                vec pivelz = static_cast<FP>(blockI.vel.z[i]);
+                const TVec piposx = static_cast<FP>(block_i.pos.x[i]);
+                const TVec piposy = static_cast<FP>(block_i.pos.y[i]);
+                const TVec piposz = static_cast<FP>(block_i.pos.z[i]);
+                TVec pivelx = static_cast<FP>(block_i.vel.x[i]);
+                TVec pively = static_cast<FP>(block_i.vel.y[i]);
+                TVec pivelz = static_cast<FP>(block_i.vel.z[i]);
 
-                for (std::size_t bj = 0; bj < BLOCKS; bj++)
+                for (std::size_t bj = 0; bj < blocks; bj++)
                 {
-                    const auto& blockJ = particles[bj];
-                    pPInteraction(
+                    const auto& block_j = particles[bj];
+                    p_p_interaction(
                         piposx,
                         piposy,
                         piposz,
                         pivelx,
                         pively,
                         pivelz,
-                        blockJ.pos.x,
-                        blockJ.pos.y,
-                        blockJ.pos.z,
-                        blockJ.mass);
+                        block_j.pos.x,
+                        block_j.pos.y,
+                        block_j.pos.z,
+                        block_j.mass);
                 }
 
-                blockI.vel.x[i] = pivelx.sum();
-                blockI.vel.y[i] = pively.sum();
-                blockI.vel.z[i] = pivelz.sum();
+                block_i.vel.x[i] = pivelx.sum();
+                block_i.vel.y[i] = pively.sum();
+                block_i.vel.z[i] = pivelz.sum();
             }
             // });
         }
     }
 
-    template <typename vec>
-    void move(ParticleBlock<vec>* particles, int threads)
+    template <typename TVec>
+    void move(ParticleBlock<TVec>* particles, int threads)
     {
-        constexpr auto BLOCKS = PROBLEM_SIZE / vec::size();
+        constexpr auto blocks = problem_size / TVec::size();
 
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t bi = 0; bi < BLOCKS; bi++)
+        for (std::ptrdiff_t bi = 0; bi < blocks; bi++)
         {
             // std::for_each(ex, particles, particles + BLOCKS, [&](ParticleBlock& block) {
             auto& block = particles[bi];
-            block.pos.x += block.vel.x * TIMESTEP;
-            block.pos.y += block.vel.y * TIMESTEP;
-            block.pos.z += block.vel.z * TIMESTEP;
+            block.pos.x += block.vel.x * timestep;
+            block.pos.y += block.vel.y * timestep;
+            block.pos.z += block.vel.z * timestep;
             // });
         }
     }
 
-    template <typename vec>
-    auto main(std::ostream& plotFile, int threads, bool useUpdate1, bool tiled = false) -> int
+    template <typename TVec>
+    auto main(std::ostream& plot_file, int threads, bool use_update1, bool tiled = false) -> int
     {
-        auto title = "AoSoA" + std::to_string(vec::size()) + " Vc" + (useUpdate1 ? " w1r8" : " w8r1"); // NOLINT
+        auto title = "AoSoA" + std::to_string(TVec::size()) + " Vc" + (use_update1 ? " w1r8" : " w8r1"); // NOLINT
         if (tiled)
             title += " tiled";
         if (threads > 1)
@@ -1063,17 +1063,17 @@ namespace manualAoSoA_Vc
         std::cout << title << '\n';
         Stopwatch watch;
 
-        static_assert(PROBLEM_SIZE % vec::size() == 0);
-        constexpr auto BLOCKS = PROBLEM_SIZE / vec::size();
-        std::vector<ParticleBlock<vec>> particles(BLOCKS);
+        static_assert(problem_size % TVec::size() == 0);
+        constexpr auto blocks = problem_size / TVec::size();
+        std::vector<ParticleBlock<TVec>> particles(blocks);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
         std::normal_distribution<FP> dist(FP(0), FP(1));
-        for (std::size_t bi = 0; bi < BLOCKS; ++bi)
+        for (std::size_t bi = 0; bi < blocks; ++bi)
         {
             auto& block = particles[bi];
-            for (std::size_t i = 0; i < vec::size(); ++i)
+            for (std::size_t i = 0; i < TVec::size(); ++i)
             {
                 block.pos.x[i] = dist(engine);
                 block.pos.y[i] = dist(engine);
@@ -1086,75 +1086,76 @@ namespace manualAoSoA_Vc
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
-                if (useUpdate1)
+                if (use_update1)
                     update1(particles.data(), threads);
                 else
                 {
                     if (tiled)
-                        update8Tiled(particles.data(), threads);
+                        update8_tiled(particles.data(), threads);
                     else
                         update8(particles.data(), threads);
                 }
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
             move(particles.data(), threads);
-            sumMove += watch.printAndReset("move");
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
 } // namespace manualAoSoA_Vc
 
-namespace manualAoS_Vc
+namespace manual_ao_s_vc
 {
-    using manualAoS::Particle;
-    using manualAoSoA_Vc::pPInteraction;
+    using manual_ao_s::Particle;
+    using manual_ao_so_a_vc::p_p_interaction;
 
-    template <typename vec>
-    const auto particleGatherScatterStrides = 42;
+    template <typename TVec>
+    const auto particle_gather_scatter_strides = 42;
 
     template <typename T>
-    const auto particleGatherScatterStrides<Vc::Vector<T>> = Vc::Vector<std::uint32_t>{Vc::IndexesFromZero}
+    const auto particle_gather_scatter_strides<Vc::Vector<T>> = Vc::Vector<std::uint32_t>{Vc::IndexesFromZero}
         * std::uint32_t{sizeof(Particle) / sizeof(FP)};
 
     template <typename T, std::size_t N>
-    const auto particleGatherScatterStrides<Vc::SimdArray<T, N>> = Vc::SimdArray<std::uint32_t, N>{Vc::IndexesFromZero}
+    const auto
+        particle_gather_scatter_strides<Vc::SimdArray<T, N>> = Vc::SimdArray<std::uint32_t, N>{Vc::IndexesFromZero}
         * std::uint32_t{sizeof(Particle) / sizeof(FP)};
 
-    template <typename vec>
+    template <typename TVec>
     void update(Particle* particles, int threads)
     {
-        constexpr auto LANES = vec::size();
-        const auto strides = particleGatherScatterStrides<vec>;
+        constexpr auto lanes = TVec::size();
+        const auto strides = particle_gather_scatter_strides<TVec>;
 
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t i = 0; i < PROBLEM_SIZE; i += LANES)
+        for (std::ptrdiff_t i = 0; i < problem_size; i += lanes)
         {
             // gather
             auto& pi = particles[i];
-            const vec piposx = vec(&pi.pos.x, strides);
-            const vec piposy = vec(&pi.pos.y, strides);
-            const vec piposz = vec(&pi.pos.z, strides);
-            vec pivelx = vec(&pi.vel.x, strides);
-            vec pively = vec(&pi.vel.y, strides);
-            vec pivelz = vec(&pi.vel.z, strides);
+            const TVec piposx = TVec(&pi.pos.x, strides);
+            const TVec piposy = TVec(&pi.pos.y, strides);
+            const TVec piposz = TVec(&pi.pos.z, strides);
+            TVec pivelx = TVec(&pi.vel.x, strides);
+            TVec pively = TVec(&pi.vel.y, strides);
+            TVec pivelz = TVec(&pi.vel.z, strides);
 
-            for (std::size_t j = 0; j < PROBLEM_SIZE; j++)
+            for (std::size_t j = 0; j < problem_size; j++)
             {
                 const auto& pj = particles[j];
-                const vec pjposx = pj.pos.x;
-                const vec pjposy = pj.pos.y;
-                const vec pjposz = pj.pos.z;
-                const vec pjmass = pj.mass;
+                const TVec pjposx = pj.pos.x;
+                const TVec pjposy = pj.pos.y;
+                const TVec pjposz = pj.pos.z;
+                const TVec pjmass = pj.mass;
 
-                pPInteraction(piposx, piposy, piposz, pivelx, pively, pivelz, pjposx, pjposy, pjposz, pjmass);
+                p_p_interaction(piposx, piposy, piposz, pivelx, pively, pivelz, pjposx, pjposy, pjposz, pjmass);
             }
 
             // scatter
@@ -1164,24 +1165,24 @@ namespace manualAoS_Vc
         }
     }
 
-    template <typename vec>
+    template <typename TVec>
     void move(Particle* particles, int threads)
     {
-        constexpr auto LANES = vec::size();
-        const auto strides = particleGatherScatterStrides<vec>;
+        constexpr auto lanes = TVec::size();
+        const auto strides = particle_gather_scatter_strides<TVec>;
 
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t i = 0; i < PROBLEM_SIZE; i += LANES)
+        for (std::ptrdiff_t i = 0; i < problem_size; i += lanes)
         {
             auto& pi = particles[i];
-            (vec(&pi.pos.x, strides) + vec(&pi.vel.x, strides) * TIMESTEP).scatter(&pi.pos.x, strides);
-            (vec(&pi.pos.y, strides) + vec(&pi.vel.y, strides) * TIMESTEP).scatter(&pi.pos.y, strides);
-            (vec(&pi.pos.z, strides) + vec(&pi.vel.z, strides) * TIMESTEP).scatter(&pi.pos.z, strides);
+            (TVec(&pi.pos.x, strides) + TVec(&pi.vel.x, strides) * timestep).scatter(&pi.pos.x, strides);
+            (TVec(&pi.pos.y, strides) + TVec(&pi.vel.y, strides) * timestep).scatter(&pi.pos.y, strides);
+            (TVec(&pi.pos.z, strides) + TVec(&pi.vel.z, strides) * timestep).scatter(&pi.pos.z, strides);
         }
     }
 
-    template <typename vec>
-    auto main(std::ostream& plotFile, int threads) -> int
+    template <typename TVec>
+    auto main(std::ostream& plot_file, int threads) -> int
     {
         auto title = "AoS Vc"s;
         if (threads > 1)
@@ -1189,7 +1190,7 @@ namespace manualAoS_Vc
         std::cout << title << '\n';
         Stopwatch watch;
 
-        std::vector<Particle> particles(PROBLEM_SIZE);
+        std::vector<Particle> particles(problem_size);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
@@ -1206,72 +1207,80 @@ namespace manualAoS_Vc
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
-                update<vec>(particles.data(), threads);
-                sumUpdate += watch.printAndReset("update", '\t');
+                update<TVec>(particles.data(), threads);
+                sum_update += watch.printAndReset("update", '\t');
             }
-            move<vec>(particles.data(), threads);
-            sumMove += watch.printAndReset("move");
+            move<TVec>(particles.data(), threads);
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
 } // namespace manualAoS_Vc
 
-namespace manualSoA_Vc
+namespace manual_so_a_vc
 {
-    using manualAoSoA_Vc::pPInteraction;
+    using manual_ao_so_a_vc::p_p_interaction;
 
-    template <typename vec>
-    void update(FP* posx, FP* posy, FP* posz, FP* velx, FP* vely, FP* velz, FP* mass, int threads)
+    template <typename TVec>
+    void update(
+        const FP* posx,
+        const FP* posy,
+        const FP* posz,
+        FP* velx,
+        FP* vely,
+        FP* velz,
+        const FP* mass,
+        int threads)
     {
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t i = 0; i < PROBLEM_SIZE; i += vec::size())
+        for (std::ptrdiff_t i = 0; i < problem_size; i += TVec::size())
         {
-            const vec piposx = vec(posx + i);
-            const vec piposy = vec(posy + i);
-            const vec piposz = vec(posz + i);
-            vec pivelx = vec(velx + i);
-            vec pively = vec(vely + i);
-            vec pivelz = vec(velz + i);
-            for (std::size_t j = 0; j < PROBLEM_SIZE; ++j)
-                pPInteraction(
+            const TVec piposx = TVec(posx + i);
+            const TVec piposy = TVec(posy + i);
+            const TVec piposz = TVec(posz + i);
+            TVec pivelx = TVec(velx + i);
+            TVec pively = TVec(vely + i);
+            TVec pivelz = TVec(velz + i);
+            for (std::size_t j = 0; j < problem_size; ++j)
+                p_p_interaction(
                     piposx,
                     piposy,
                     piposz,
                     pivelx,
                     pively,
                     pivelz,
-                    vec(posx[j]),
-                    vec(posy[j]),
-                    vec(posz[j]),
-                    vec(mass[j]));
+                    TVec(posx[j]),
+                    TVec(posy[j]),
+                    TVec(posz[j]),
+                    TVec(mass[j]));
             pivelx.store(velx + i);
             pively.store(vely + i);
             pivelz.store(velz + i);
         }
     }
 
-    template <typename vec>
+    template <typename TVec>
     void move(FP* posx, FP* posy, FP* posz, const FP* velx, const FP* vely, const FP* velz, int threads)
     {
 #    pragma omp parallel for schedule(static) num_threads(threads)
-        for (std::ptrdiff_t i = 0; i < PROBLEM_SIZE; i += vec::size())
+        for (std::ptrdiff_t i = 0; i < problem_size; i += TVec::size())
         {
-            (vec(posx + i) + vec(velx + i) * TIMESTEP).store(posx + i);
-            (vec(posy + i) + vec(vely + i) * TIMESTEP).store(posy + i);
-            (vec(posz + i) + vec(velz + i) * TIMESTEP).store(posz + i);
+            (TVec(posx + i) + TVec(velx + i) * timestep).store(posx + i);
+            (TVec(posy + i) + TVec(vely + i) * timestep).store(posy + i);
+            (TVec(posz + i) + TVec(velz + i) * timestep).store(posz + i);
         }
     }
 
-    template <typename vec>
-    auto main(std::ostream& plotFile, int threads) -> int
+    template <typename TVec>
+    auto main(std::ostream& plot_file, int threads) -> int
     {
         auto title = "SoA Vc"s;
         if (threads > 1)
@@ -1280,18 +1289,18 @@ namespace manualSoA_Vc
         Stopwatch watch;
 
         using Vector = std::vector<FP, llama::bloballoc::AlignedAllocator<FP, 64>>;
-        Vector posx(PROBLEM_SIZE);
-        Vector posy(PROBLEM_SIZE);
-        Vector posz(PROBLEM_SIZE);
-        Vector velx(PROBLEM_SIZE);
-        Vector vely(PROBLEM_SIZE);
-        Vector velz(PROBLEM_SIZE);
-        Vector mass(PROBLEM_SIZE);
+        Vector posx(problem_size);
+        Vector posy(problem_size);
+        Vector posz(problem_size);
+        Vector velx(problem_size);
+        Vector vely(problem_size);
+        Vector velz(problem_size);
+        Vector mass(problem_size);
         watch.printAndReset("alloc");
 
         std::default_random_engine engine;
         std::normal_distribution<FP> dist(FP(0), FP(1));
-        for (std::size_t i = 0; i < PROBLEM_SIZE; ++i)
+        for (std::size_t i = 0; i < problem_size; ++i)
         {
             posx[i] = dist(engine);
             posy[i] = dist(engine);
@@ -1303,13 +1312,13 @@ namespace manualSoA_Vc
         }
         watch.printAndReset("init");
 
-        double sumUpdate = 0;
-        double sumMove = 0;
-        for (std::size_t s = 0; s < STEPS; ++s)
+        double sum_update = 0;
+        double sum_move = 0;
+        for (std::size_t s = 0; s < steps; ++s)
         {
-            if constexpr (RUN_UPATE)
+            if constexpr (run_upate)
             {
-                update<vec>(
+                update<TVec>(
                     posx.data(),
                     posy.data(),
                     posz.data(),
@@ -1318,12 +1327,12 @@ namespace manualSoA_Vc
                     velz.data(),
                     mass.data(),
                     threads);
-                sumUpdate += watch.printAndReset("update", '\t');
+                sum_update += watch.printAndReset("update", '\t');
             }
-            move<vec>(posx.data(), posy.data(), posz.data(), velx.data(), vely.data(), velz.data(), threads);
-            sumMove += watch.printAndReset("move");
+            move<TVec>(posx.data(), posy.data(), posz.data(), velx.data(), vely.data(), velz.data(), threads);
+            sum_move += watch.printAndReset("move");
         }
-        plotFile << std::quoted(title) << "\t" << sumUpdate / STEPS << '\t' << sumMove / STEPS << '\n';
+        plot_file << std::quoted(title) << "\t" << sum_update / steps << '\t' << sum_move / steps << '\n';
 
         return 0;
     }
@@ -1334,14 +1343,14 @@ auto main() -> int
 try
 {
 #if __has_include(<Vc/Vc>)
-    using vec = Vc::Vector<FP>;
+    using Vec = Vc::Vector<FP>;
     // using vec = Vc::SimdArray<FP, 16>;
-    constexpr auto SIMDLanes = vec::size();
+    constexpr auto simd_lanes = vec::size();
 #else
     constexpr auto SIMDLanes = 1;
 #endif
 
-    const auto numThreads = static_cast<std::size_t>(omp_get_max_threads());
+    const auto num_threads = static_cast<std::size_t>(omp_get_max_threads());
     const char* affinity = std::getenv("GOMP_CPU_AFFINITY");
     affinity = affinity == nullptr ? "NONE - PLEASE PIN YOUR THREADS!" : affinity;
 
@@ -1351,15 +1360,15 @@ Threads: {}
 Affinity: {}
 SIMD lanes: {}
 )",
-        PROBLEM_SIZE / 1024,
-        PROBLEM_SIZE * sizeof(FP) * 7 / 1024,
-        numThreads,
+        problem_size / 1024,
+        problem_size * sizeof(FP) * 7 / 1024,
+        num_threads,
         affinity,
-        SIMDLanes);
+        simd_lanes);
 
-    std::ofstream plotFile{"nbody.sh"};
-    plotFile.exceptions(std::ios::badbit | std::ios::failbit);
-    plotFile << fmt::format(
+    std::ofstream plot_file{"nbody.sh"};
+    plot_file.exceptions(std::ios::badbit | std::ios::failbit);
+    plot_file << fmt::format(
         R"(#!/usr/bin/gnuplot -p
 # threads: {} affinity: {} SIMD lanes: {}
 set title "nbody CPU {}ki particles on {}"
@@ -1374,12 +1383,12 @@ set y2label "move runtime [s]"
 set y2tics auto
 $data << EOD
 )",
-        numThreads,
+        num_threads,
         affinity,
-        SIMDLanes,
-        PROBLEM_SIZE / 1024,
+        simd_lanes,
+        problem_size / 1024,
         common::hostname());
-    plotFile << "\"\"\t\"update\"\t\"move\"\n";
+    plot_file << "\"\"\t\"update\"\t\"move\"\n";
 
     // Note:
     // Tiled versions did not give any performance benefit, so they are disabled by default.
@@ -1389,27 +1398,27 @@ $data << EOD
     int r = 0;
     using namespace boost::mp11;
     mp_for_each<mp_iota_c<5>>(
-        [&](auto i)
+        [plot_file](auto i)
         {
             // only AoSoA (3) needs lanes
             using Lanes
                 = std::conditional_t<decltype(i)::value == 3, mp_list_c<std::size_t, 8, 16>, mp_list_c<std::size_t, 0>>;
-            mp_for_each<Lanes>([&, i](auto lanes)
-                               { r += usellama::main<decltype(i)::value, decltype(lanes)::value>(plotFile); });
+            mp_for_each<Lanes>([plot_file, i](auto lanes)
+                               { r += usellama::main<decltype(i)::value, decltype(lanes)::value>(plot_file); });
         });
-    r += manualAoS::main(plotFile);
-    r += manualSoA::main(plotFile);
+    r += manual_ao_s::main(plot_file);
+    r += manual_so_a::main(plot_file);
     mp_for_each<mp_list_c<std::size_t, 8, 16>>(
-        [&](auto lanes)
+        [plot_file](auto lanes)
         {
             // for (auto tiled : {false, true})
             //    r += manualAoSoA::main<decltype(lanes)::value>(plotFile, tiled);
-            r += manualAoSoA::main<decltype(lanes)::value>(plotFile, false);
+            r += manual_ao_so_a::main<decltype(lanes)::value>(plot_file, false);
         });
 #ifdef __AVX2__
     // for (auto useUpdate1 : {false, true})
     //    r += manualAoSoA_manualAVX::main(plotFile, useUpdate1);
-    r += manualAoSoA_manualAVX::main(plotFile, false);
+    r += manual_ao_so_a_manual_avx::main(plot_file, false);
 #endif
 #if __has_include(<Vc/Vc>)
     for (int threads = 1; threads <= std::thread::hardware_concurrency(); threads *= 2)
@@ -1421,20 +1430,20 @@ $data << EOD
         //            continue;
         //        r += manualAoSoA_Vc::main<vec>(plotFile, threads, useUpdate1, tiled);
         //    }
-        r += manualAoSoA_Vc::main<vec>(plotFile, threads, false, false);
+        r += manual_ao_so_a_vc::main<vec>(plot_file, threads, false, false);
     }
     for (int threads = 1; threads <= std::thread::hardware_concurrency(); threads *= 2)
     {
         // mp_for_each<mp_list_c<std::size_t, 1, 2, 4, 8, 16>>(
         //    [&](auto lanes) { r += manualAoS_Vc::main<Vc::SimdArray<FP, decltype(lanes)::value>>(plotFile, threads);
         //    });
-        r += manualAoS_Vc::main<vec>(plotFile, threads);
+        r += manual_ao_s_vc::main<vec>(plot_file, threads);
     }
     for (int threads = 1; threads <= std::thread::hardware_concurrency(); threads *= 2)
-        r += manualSoA_Vc::main<vec>(plotFile, threads);
+        r += manual_so_a_vc::main<vec>(plot_file, threads);
 #endif
 
-    plotFile << R"(EOD
+    plot_file << R"(EOD
 plot $data using 2:xtic(1) ti col axis x1y1, "" using 3 ti col axis x1y2
 )";
     std::cout << "Plot with: ./nbody.sh\n";

@@ -19,10 +19,10 @@ TEST_CASE("ArrayDims.CTAD")
 TEST_CASE("ArrayDims.dim0")
 {
     using ArrayDims = llama::ArrayDims<0>;
-    ArrayDims arrayDims{};
+    ArrayDims array_dims{};
 
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    Mapping mapping{arrayDims};
+    Mapping mapping{array_dims};
     auto view = allocView(mapping);
 
     double& x1 = view(ArrayDims{})(tag::Pos{}, tag::X{});
@@ -32,10 +32,10 @@ TEST_CASE("ArrayDims.dim0")
 TEST_CASE("ArrayDims.dim1")
 {
     using ArrayDims = llama::ArrayDims<1>;
-    ArrayDims arrayDims{16};
+    ArrayDims array_dims{16};
 
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    Mapping mapping{arrayDims};
+    Mapping mapping{array_dims};
     auto view = allocView(mapping);
 
     double& x = view(ArrayDims{0})(tag::Pos{}, tag::X{});
@@ -45,10 +45,10 @@ TEST_CASE("ArrayDims.dim1")
 TEST_CASE("ArrayDims.dim2")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    ArrayDims arrayDims{16, 16};
+    ArrayDims array_dims{16, 16};
 
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    Mapping mapping{arrayDims};
+    Mapping mapping{array_dims};
     auto view = allocView(mapping);
 
     double& x = view(ArrayDims{0, 0})(tag::Pos{}, tag::X{});
@@ -58,10 +58,10 @@ TEST_CASE("ArrayDims.dim2")
 TEST_CASE("ArrayDims.dim3")
 {
     using ArrayDims = llama::ArrayDims<3>;
-    ArrayDims arrayDims{16, 16, 16};
+    ArrayDims array_dims{16, 16, 16};
 
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    Mapping mapping{arrayDims};
+    Mapping mapping{array_dims};
     auto view = allocView(mapping);
 
     double& x = view(ArrayDims{0, 0, 0})(tag::Pos{}, tag::X{});
@@ -71,10 +71,10 @@ TEST_CASE("ArrayDims.dim3")
 TEST_CASE("ArrayDims.dim10")
 {
     using ArrayDims = llama::ArrayDims<10>;
-    ArrayDims arrayDims{2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
+    ArrayDims array_dims{2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
 
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    Mapping mapping{arrayDims};
+    Mapping mapping{array_dims};
     auto view = allocView(mapping);
 
     double& x = view(ArrayDims{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})(tag::Pos{}, tag::X{});
@@ -285,7 +285,7 @@ TEST_CASE("ArrayDimsIndexRange3D.destructering")
 TEST_CASE("Morton")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    ArrayDims arrayDims{2, 3};
+    ArrayDims array_dims{2, 3};
 
     llama::mapping::LinearizeArrayDimsMorton lin;
     CHECK(lin.size(ArrayDims{2, 3}) == 4 * 4);
@@ -313,20 +313,20 @@ TEST_CASE("Morton")
 
 TEST_CASE("forEachADCoord_1D")
 {
-    llama::ArrayDims<1> adSize{3};
+    llama::ArrayDims<1> ad_size{3};
 
     std::vector<llama::ArrayDims<1>> coords;
-    llama::forEachADCoord(adSize, [&](llama::ArrayDims<1> coord) { coords.push_back(coord); });
+    llama::forEachADCoord(ad_size, [&](llama::ArrayDims<1> coord) { coords.push_back(coord); });
 
     CHECK(coords == std::vector<llama::ArrayDims<1>>{{0}, {1}, {2}});
 }
 
 TEST_CASE("forEachADCoord_2D")
 {
-    llama::ArrayDims<2> adSize{3, 3};
+    llama::ArrayDims<2> ad_size{3, 3};
 
     std::vector<llama::ArrayDims<2>> coords;
-    llama::forEachADCoord(adSize, [&](llama::ArrayDims<2> coord) { coords.push_back(coord); });
+    llama::forEachADCoord(ad_size, [&](llama::ArrayDims<2> coord) { coords.push_back(coord); });
 
     CHECK(
         coords
@@ -335,10 +335,10 @@ TEST_CASE("forEachADCoord_2D")
 
 TEST_CASE("forEachADCoord_3D")
 {
-    llama::ArrayDims<3> adSize{3, 3, 3};
+    llama::ArrayDims<3> ad_size{3, 3, 3};
 
     std::vector<llama::ArrayDims<3>> coords;
-    llama::forEachADCoord(adSize, [&](llama::ArrayDims<3> coord) { coords.push_back(coord); });
+    llama::forEachADCoord(ad_size, [&](llama::ArrayDims<3> coord) { coords.push_back(coord); });
 
     CHECK(
         coords

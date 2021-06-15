@@ -9,7 +9,7 @@ TEST_CASE("prettyPrintType")
 #ifdef _WIN32
     replace_all(str, "__int64", "long");
 #endif
-    const auto ref = R"(llama::Record<
+    const auto* const ref = R"(llama::Record<
     llama::Field<
         tag::Pos,
         llama::Record<

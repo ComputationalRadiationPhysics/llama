@@ -40,11 +40,11 @@ namespace tag
 TEST_CASE("treemapping.empty")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -108,11 +108,11 @@ TEST_CASE("treemapping.empty")
 TEST_CASE("treemapping.Idem")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::Idem()};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::Idem()};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -176,11 +176,11 @@ TEST_CASE("treemapping.Idem")
 TEST_CASE("treemapping.LeafOnlyRT")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::LeafOnlyRT()};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::LeafOnlyRT()};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -244,11 +244,11 @@ TEST_CASE("treemapping.LeafOnlyRT")
 TEST_CASE("treemapping.MoveRTDown<>")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::MoveRTDown<tree::TreeCoord<>>{4}};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::MoveRTDown<tree::TreeCoord<>>{4}};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -300,11 +300,11 @@ TEST_CASE("treemapping.MoveRTDown<>")
 TEST_CASE("treemapping.MoveRTDown<0>")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::MoveRTDown<tree::TreeCoord<0>>{4}};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::MoveRTDown<tree::TreeCoord<0>>{4}};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -356,11 +356,11 @@ TEST_CASE("treemapping.MoveRTDown<0>")
 TEST_CASE("treemapping.MoveRTDown<0,0>")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::MoveRTDown<tree::TreeCoord<0, 0>>{4}};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::MoveRTDown<tree::TreeCoord<0, 0>>{4}};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -412,11 +412,11 @@ TEST_CASE("treemapping.MoveRTDown<0,0>")
 TEST_CASE("treemapping.MoveRTDownFixed<>")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::MoveRTDownFixed<tree::TreeCoord<>, 4>{}};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::MoveRTDownFixed<tree::TreeCoord<>, 4>{}};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -468,11 +468,11 @@ TEST_CASE("treemapping.MoveRTDownFixed<>")
 TEST_CASE("treemapping.MoveRTDownFixed<0>")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::MoveRTDownFixed<tree::TreeCoord<0>, 4>{}};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::MoveRTDownFixed<tree::TreeCoord<0>, 4>{}};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -524,11 +524,11 @@ TEST_CASE("treemapping.MoveRTDownFixed<0>")
 TEST_CASE("treemapping.MoveRTDownFixed<0,0>")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{tree::functor::MoveRTDownFixed<tree::TreeCoord<0, 0>, 4>{}};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{tree::functor::MoveRTDownFixed<tree::TreeCoord<0, 0>, 4>{}};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -580,18 +580,18 @@ TEST_CASE("treemapping.MoveRTDownFixed<0,0>")
 TEST_CASE("treemapping.vectorblocks.runtime")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    const auto vectorWidth = 8;
+    const auto vector_width = 8;
 
-    auto treeOperationList = llama::Tuple{
-        tree::functor::MoveRTDown<tree::TreeCoord<0>>{vectorWidth}, // move 8 down from ArrayDims (to
-                                                                    // Position/Mass/Vel)
-        tree::functor::MoveRTDown<tree::TreeCoord<0, 0>>{vectorWidth}, // move 8 down from Position (to X/Y/Z)
-        tree::functor::MoveRTDown<tree::TreeCoord<0, 2>>{vectorWidth}, // move 8 down from Vel (to X/Y/Z)
+    auto tree_operation_list = llama::Tuple{
+        tree::functor::MoveRTDown<tree::TreeCoord<0>>{vector_width}, // move 8 down from ArrayDims (to
+                                                                     // Position/Mass/Vel)
+        tree::functor::MoveRTDown<tree::TreeCoord<0, 0>>{vector_width}, // move 8 down from Position (to X/Y/Z)
+        tree::functor::MoveRTDown<tree::TreeCoord<0, 2>>{vector_width}, // move 8 down from Vel (to X/Y/Z)
     };
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -643,18 +643,18 @@ TEST_CASE("treemapping.vectorblocks.runtime")
 TEST_CASE("treemapping.vectorblocks.compiletime")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    constexpr auto vectorWidth = 8;
+    constexpr auto vector_width = 8;
 
-    auto treeOperationList = llama::Tuple{
-        tree::functor::MoveRTDownFixed<tree::TreeCoord<0>, vectorWidth>{}, // move 8 down from ArrayDims (to
-                                                                           // Position/Mass/Vel)
-        tree::functor::MoveRTDownFixed<tree::TreeCoord<0, 0>, vectorWidth>{}, // move 8 down from Position (to X/Y/Z)
-        tree::functor::MoveRTDownFixed<tree::TreeCoord<0, 2>, vectorWidth>{}, // move 8 down from Vel (to X/Y/Z)
+    auto tree_operation_list = llama::Tuple{
+        tree::functor::MoveRTDownFixed<tree::TreeCoord<0>, vector_width>{}, // move 8 down from ArrayDims (to
+                                                                            // Position/Mass/Vel)
+        tree::functor::MoveRTDownFixed<tree::TreeCoord<0, 0>, vector_width>{}, // move 8 down from Position (to X/Y/Z)
+        tree::functor::MoveRTDownFixed<tree::TreeCoord<0, 2>, vector_width>{}, // move 8 down from Vel (to X/Y/Z)
     };
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     CHECK(
         tree::toString(mapping.basicTree)
@@ -706,11 +706,11 @@ TEST_CASE("treemapping.vectorblocks.compiletime")
 TEST_CASE("treemapping.getNode")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{16, 16};
+    const ArrayDims array_dims{16, 16};
 
-    auto treeOperationList = llama::Tuple{};
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    auto tree_operation_list = llama::Tuple{};
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     using namespace tree;
     using namespace tree::functor::internal;
@@ -749,21 +749,21 @@ TEST_CASE("treemapping.getNode")
 
 TEST_CASE("treemapping")
 {
-    constexpr std::size_t arrayDimsSize = 12;
+    constexpr std::size_t array_dims_size = 12;
 
     using ArrayDims = llama::ArrayDims<2>;
-    const ArrayDims arrayDims{arrayDimsSize, arrayDimsSize};
+    const ArrayDims array_dims{array_dims_size, array_dims_size};
 
-    auto treeOperationList = llama::Tuple{tree::functor::Idem(), tree::functor::LeafOnlyRT{}, tree::functor::Idem{}};
+    auto tree_operation_list = llama::Tuple{tree::functor::Idem(), tree::functor::LeafOnlyRT{}, tree::functor::Idem{}};
 
-    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(treeOperationList)>;
-    const Mapping mapping(arrayDims, treeOperationList);
+    using Mapping = tree::Mapping<ArrayDims, Particle, decltype(tree_operation_list)>;
+    const Mapping mapping(array_dims, tree_operation_list);
 
     auto raw = prettyPrintType(mapping.basicTree);
 #ifdef _WIN32
     replace_all(raw, "__int64", "long");
 #endif
-    const auto ref = R"(llama::mapping::tree::Node<
+    const auto* const ref = R"(llama::mapping::tree::Node<
     llama::NoName,
     llama::Tuple<
         llama::mapping::tree::Node<
@@ -904,7 +904,7 @@ TEST_CASE("treemapping")
 #ifdef _WIN32
     replace_all(raw2, "__int64", "long");
 #endif
-    const auto ref2 = R"(llama::mapping::tree::Node<
+    const auto* const ref2 = R"(llama::mapping::tree::Node<
     llama::NoName,
     llama::Tuple<
         llama::mapping::tree::Node<
@@ -1032,15 +1032,15 @@ TEST_CASE("treemapping")
     auto view = allocView(mapping);
     zeroStorage(view);
 
-    for (size_t x = 0; x < arrayDims[0]; ++x)
-        for (size_t y = 0; y < arrayDims[1]; ++y)
+    for (size_t x = 0; x < array_dims[0]; ++x)
+        for (size_t y = 0; y < array_dims[1]; ++y)
         {
             auto record = view(x, y);
             llama::forEachLeaf<Particle>([&](auto coord) { record(coord) = 0; }, tag::Vel{});
         }
     double sum = 0.0;
-    for (size_t x = 0; x < arrayDims[0]; ++x)
-        for (size_t y = 0; y < arrayDims[1]; ++y)
+    for (size_t x = 0; x < array_dims[0]; ++x)
+        for (size_t y = 0; y < array_dims[1]; ++y)
             sum += view({x, y})(llama::RecordCoord<0, 1>{});
     CHECK(sum == 0);
 }

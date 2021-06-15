@@ -25,8 +25,8 @@
 
 namespace
 {
-    constexpr auto useStdVectorForTriangles = false; // you can set this to true for a baseline benchmark
-    constexpr auto useMipmaps = true;
+    constexpr auto use_std_vector_for_triangles = false; // you can set this to true for a baseline benchmark
+    constexpr auto use_mipmaps = true;
 
     // clang-format off
     struct X {};
@@ -88,15 +88,15 @@ namespace
             return *this;
         }
 
-        template <typename Scalar>
-        inline auto operator*=(Scalar scalar) -> Vector&
+        template <typename TScalar>
+        inline auto operator*=(TScalar scalar) -> Vector&
         {
             for (int i = 0; i < 3; i++)
                 values[i] *= scalar;
             return *this;
         }
 
-        inline auto lengthSqr() const
+        inline auto length_sqr() const
         {
             F r = 0;
             for (int i = 0; i < 3; i++)
@@ -106,7 +106,7 @@ namespace
 
         inline auto length() const
         {
-            return std::sqrt(lengthSqr());
+            return std::sqrt(length_sqr());
         }
 
         inline void normalize()
@@ -212,7 +212,7 @@ namespace
 
     using VectorF = Vector<float>;
 
-    inline auto solveQuadraticEquation(double a, double b, double c) -> std::vector<double>
+    inline auto solve_quadratic_equation(double a, double b, double c) -> std::vector<double>
     {
         const double discriminat = b * b - 4 * a * c;
         if (discriminat < 0)
@@ -228,7 +228,7 @@ namespace
 
     struct Camera
     {
-        float fovy; // in degree
+        float fovy{}; // in degree
         VectorF position;
         VectorF view;
         VectorF up;
@@ -243,13 +243,13 @@ namespace
     struct Vertex
     {
         VectorF pos;
-        float u;
-        float v;
+        float u{};
+        float v{};
     };
 
     struct Triangle : std::array<Vertex, 3>
     {
-        int texIndex;
+        int tex_index{};
     };
 
     struct AABB
@@ -276,8 +276,8 @@ namespace
         VectorF edge2;
         std::array<float, 3> u;
         std::array<float, 3> v;
-        int texIndex;
-        float texBaseLod;
+        int tex_index;
+        float tex_base_lod;
 
         inline auto normal() const -> VectorF
         {
@@ -308,9 +308,9 @@ namespace
         if constexpr (I == 4)
             return pt.v;
         if constexpr (I == 5)
-            return pt.texIndex;
+            return pt.tex_index;
         if constexpr (I == 6)
-            return pt.texBaseLod;
+            return pt.tex_base_lod;
     }
 
     class Image
@@ -318,7 +318,7 @@ namespace
     public:
         using Pixel = Vector<unsigned char>;
 
-        Image(const std::filesystem::path& filename)
+        explicit Image(const std::filesystem::path& filename)
         {
             int x = 0;
             int y = 0;
@@ -330,59 +330,59 @@ namespace
             // if (comp != 3)
             //    throw std::runtime_error(
             //        "Image " + filename.string() + " does not have 3 channels but " + std::to_string(comp));
-            w = x;
-            h = y;
-            pixels.resize(w * h);
-            std::memcpy(pixels.data(), data, w * h * 3);
+            m_w = x;
+            m_h = y;
+            m_pixels.resize(m_w * m_h);
+            std::memcpy(m_pixels.data(), data, m_w * m_h * 3);
             stbi_image_free(data);
         }
 
-        Image(unsigned int width, unsigned int height) : w(width), h(height), pixels(width * height)
+        Image(unsigned int width, unsigned int height) : m_w(width), m_h(height), m_pixels(width * height)
         {
         }
 
         inline auto width() const
         {
-            return w;
+            return m_w;
         }
 
         inline auto height() const
         {
-            return h;
+            return m_h;
         }
 
         inline auto operator()(unsigned int x, unsigned int y) -> Pixel&
         {
-            return pixels[y * w + x];
+            return m_pixels[y * m_w + x];
         }
 
         inline auto operator()(unsigned int x, unsigned int y) const -> const Pixel&
         {
-            return pixels[y * w + x];
+            return m_pixels[y * m_w + x];
         }
 
         void write(const std::filesystem::path& filename) const
         {
-            if (!stbi_write_png(filename.string().c_str(), w, h, 3, pixels.data(), 0))
+            if (stbi_write_png(filename.string().c_str(), m_w, m_h, 3, m_pixels.data(), 0) == 0)
                 throw std::runtime_error("Failed to write image " + filename.string());
         }
 
     private:
-        unsigned int w;
-        unsigned int h;
-        std::vector<Pixel> pixels;
+        unsigned int m_w;
+        unsigned int m_h;
+        std::vector<Pixel> m_pixels;
     };
 
-    constexpr auto noHit = std::numeric_limits<float>::infinity();
+    constexpr auto no_hit = std::numeric_limits<float>::infinity();
 
     struct Intersection
     {
-        float distance = noHit;
+        float distance = no_hit;
         VectorF normal;
-        float texU = 0;
-        float texV = 0;
-        int texIndex = -1;
-        float baseLod = 0;
+        float tex_u = 0;
+        float tex_v = 0;
+        int tex_index = -1;
+        float base_lod = 0;
     };
 
     struct Ray
@@ -391,23 +391,27 @@ namespace
         VectorF direction;
     };
 
-    inline auto createRay(const Camera& camera, unsigned int width, unsigned int height, unsigned int x, unsigned int y)
-        -> Ray
+    inline auto create_ray(
+        const Camera& camera,
+        unsigned int width,
+        unsigned int height,
+        unsigned int x,
+        unsigned int y) -> Ray
     {
         // we imagine a plane with the image just 1 before the camera, and then we shoot at those pixels
 
         const auto center = camera.position + camera.view;
-        const auto xVec = cross(camera.view, camera.up);
-        const auto yVec = camera.up;
+        const auto x_vec = cross(camera.view, camera.up);
+        const auto y_vec = camera.up;
 
         const auto delta = (std::tan(camera.fovy * boost::math::constants::pi<float>() / 180.0f) * 2) / (height - 1);
-        const auto xDeltaVec = xVec * delta;
-        const auto yDeltaVec = yVec * delta;
+        const auto x_delta_vec = x_vec * delta;
+        const auto y_delta_vec = y_vec * delta;
 
-        const auto xRel = (x - static_cast<float>(width - 1) / 2);
-        const auto yRel = (y - static_cast<float>(height - 1) / 2);
+        const auto x_rel = (x - static_cast<float>(width - 1) / 2);
+        const auto y_rel = (y - static_cast<float>(height - 1) / 2);
 
-        const auto pixel = center + xDeltaVec * xRel + yDeltaVec * yRel;
+        const auto pixel = center + x_delta_vec * x_rel + y_delta_vec * y_rel;
 
         Ray r;
         r.origin = center;
@@ -421,18 +425,21 @@ namespace
 
     // from:
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
-    inline auto intersectBox(const Ray& r, const AABB& box) -> std::pair<float, float>
+    inline auto intersect_box(const Ray& r, const AABB& box) -> std::pair<float, float>
     {
         const auto invdir = 1.0f / r.direction;
         const VectorF bounds[] = {box.lower, box.upper};
-        const int sign[] = {r.direction[0] < 0, r.direction[1] < 0, r.direction[2] < 0};
+        const int sign[]
+            = {static_cast<const int>(r.direction[0] < 0),
+               static_cast<const int>(r.direction[1] < 0),
+               static_cast<const int>(r.direction[2] < 0)};
 
         float tmin = (bounds[sign[0]][0] - r.origin[0]) * invdir[0];
         float tmax = (bounds[1 - sign[0]][0] - r.origin[0]) * invdir[0];
         const float tymin = (bounds[sign[1]][1] - r.origin[1]) * invdir[1];
         const float tymax = (bounds[1 - sign[1]][1] - r.origin[1]) * invdir[1];
         if ((tmin > tymax) || (tymin > tmax))
-            return {noHit, noHit};
+            return {no_hit, no_hit};
         if (tymin > tmin)
             tmin = tymin;
         if (tymax < tmax)
@@ -441,7 +448,7 @@ namespace
         const float tzmin = (bounds[sign[2]][2] - r.origin[2]) * invdir[2];
         const float tzmax = (bounds[1 - sign[2]][2] - r.origin[2]) * invdir[2];
         if ((tmin > tzmax) || (tzmin > tmax))
-            return {noHit, noHit};
+            return {no_hit, no_hit};
         if (tzmin > tmin)
             tmin = tzmin;
         if (tzmax < tmax)
@@ -458,9 +465,9 @@ namespace
         // solve quadratic equation
         const auto a = 1;
         const auto b = 2 * dot(ray.direction, (ray.origin - sphere.center));
-        const auto c = (ray.origin - sphere.center).lengthSqr() - sphere.radius * sphere.radius;
+        const auto c = (ray.origin - sphere.center).length_sqr() - sphere.radius * sphere.radius;
 
-        const auto solutions = solveQuadraticEquation(a, b, c);
+        const auto solutions = solve_quadratic_equation(a, b, c);
         if (solutions.empty())
             return {};
 
@@ -494,14 +501,14 @@ namespace
         if (t < 0)
             return {};
 
-        const auto texU = (1 - u - v) * triangle.u[0] + u * triangle.u[1] + v * triangle.u[2];
-        const auto texV = (1 - u - v) * triangle.v[0] + u * triangle.v[1] + v * triangle.v[2];
+        const auto tex_u = (1 - u - v) * triangle.u[0] + u * triangle.u[1] + v * triangle.u[2];
+        const auto tex_v = (1 - u - v) * triangle.v[0] + u * triangle.v[1] + v * triangle.v[2];
 
-        return {t, triangle.normal(), texU, texV, triangle.texIndex, triangle.texBaseLod};
+        return {t, triangle.normal(), tex_u, tex_v, triangle.tex_index, triangle.tex_base_lod};
     }
 
-    template <typename PreparedTriangle>
-    inline auto intersect(const Ray& ray, PreparedTriangle triangle) -> Intersection
+    template <typename TPreparedTriangle>
+    inline auto intersect(const Ray& ray, TPreparedTriangle triangle) -> Intersection
     {
         constexpr auto epsilon = 0.000001f;
 
@@ -527,10 +534,10 @@ namespace
             return {};
 
         using namespace llama::literals;
-        const auto texU = (1 - u - v) * triangle(U{}, 0_RC) + u * triangle(U{}, 1_RC) + v * triangle(U{}, 2_RC);
-        const auto texV = (1 - u - v) * triangle(V{}, 0_RC) + u * triangle(V{}, 1_RC) + v * triangle(V{}, 2_RC);
+        const auto tex_u = (1 - u - v) * triangle(U{}, 0_RC) + u * triangle(U{}, 1_RC) + v * triangle(U{}, 2_RC);
+        const auto tex_v = (1 - u - v) * triangle(V{}, 0_RC) + u * triangle(V{}, 1_RC) + v * triangle(V{}, 2_RC);
         const auto normal = cross(edge1, edge2).normalized();
-        return {t, normal, texU, texV, triangle(TexId{}), triangle(BaseLod{})};
+        return {t, normal, tex_u, tex_v, triangle(TexId{}), triangle(BaseLod{})};
     }
 
     // from: https://stackoverflow.com/questions/4578967/cube-sphere-intersection-test
@@ -566,7 +573,8 @@ namespace
 
         auto planeBoxOverlap = [](VectorF normal, VectorF vert, VectorF maxbox) -> bool
         {
-            VectorF vmin, vmax;
+            VectorF vmin;
+            VectorF vmax;
             for (int q : {0, 1, 2})
             {
                 float v = vert[q];
@@ -584,9 +592,7 @@ namespace
 
             if (dot(normal, vmin) > 0.0f)
                 return false;
-            if (dot(normal, vmax) >= 0.0f)
-                return true;
-            return false;
+            return dot(normal, vmax) >= 0.0f;
         };
 
 #define AXISTEST_X01(a, b, fa, fb)                                                                                     \
@@ -693,7 +699,12 @@ namespace
 
         const auto boxcenter = box.center();
         const auto boxhalfsize = (box.upper - box.lower) * 0.5;
-        float min, max, p0, p1, p2, rad;
+        float min;
+        float max;
+        float p0;
+        float p1;
+        float p2;
+        float rad;
 
         // const auto v0 = t[0] - boxcenter;
         // const auto v1 = t[1] - boxcenter;
@@ -740,14 +751,11 @@ namespace
             return false;
 
         const auto normal = cross(e0, e1);
-        if (!planeBoxOverlap(normal, v0, boxhalfsize))
-            return false;
-
-        return true;
+        return planeBoxOverlap(normal, v0, boxhalfsize);
     }
 
-    template <typename VirtualRecord>
-    auto overlaps(const VirtualRecord& t, const AABB& box) -> bool
+    template <typename TVirtualRecord>
+    auto overlaps(const TVirtualRecord& t, const AABB& box) -> bool
     {
         return overlaps(t.template loadAs<PreparedTriangle>(), box);
     }
@@ -758,14 +766,14 @@ namespace
 
         struct Objects
         {
-            std::conditional_t<useStdVectorForTriangles, std::vector<PreparedTriangle>, llama::Vector<Mapping>>
+            std::conditional_t<use_std_vector_for_triangles, std::vector<PreparedTriangle>, llama::Vector<Mapping>>
                 triangles;
             std::vector<Sphere> spheres;
         };
         using Children = std::array<OctreeNode*, 8>;
         std::variant<Objects, Children> content;
 
-        inline auto hasChildren() const -> bool
+        inline auto has_children() const -> bool
         {
             return std::holds_alternative<Children>(content);
         }
@@ -791,20 +799,20 @@ namespace
         }
 
         template <typename T>
-        void addObject(std::deque<OctreeNode>& pool, const T& object, int depth = 0)
+        void add_object(std::deque<OctreeNode>& pool, const T& object, int depth = 0)
         {
-            if (hasChildren())
+            if (has_children())
             {
                 for (auto& c : children())
                     if (overlaps(object, c->box))
-                        c->addObject(pool, object, depth + 1);
+                        c->add_object(pool, object, depth + 1);
             }
             else
             {
-                if (shouldSplit(depth))
+                if (should_split(depth))
                 {
                     split(pool, depth);
-                    addObject(pool, object, depth);
+                    add_object(pool, object, depth);
                 }
                 else
                 {
@@ -817,13 +825,13 @@ namespace
         }
 
     private:
-        static constexpr auto maxTrianglesPerNode = 32;
-        static constexpr auto maxDepth = 16;
+        static constexpr auto max_triangles_per_node = 32;
+        static constexpr auto max_depth = 16;
 
-        inline auto shouldSplit(int depth) const -> bool
+        inline auto should_split(int depth) const -> bool
         {
-            auto& objects = std::get<Objects>(content);
-            return depth < maxDepth && objects.triangles.size() >= maxTrianglesPerNode;
+            const auto& objects = std::get<Objects>(content);
+            return depth < max_depth && objects.triangles.size() >= max_triangles_per_node;
         }
 
         inline void split(std::deque<OctreeNode>& pool, int depth)
@@ -835,7 +843,7 @@ namespace
                 for (auto y : {0, 1})
                     for (auto z : {0, 1})
                     {
-                        const auto childBox = AABB{
+                        const auto child_box = AABB{
                             {
                                 points[x][0],
                                 points[y][1],
@@ -846,58 +854,58 @@ namespace
                                 points[y + 1][1],
                                 points[z + 1][2],
                             }};
-                        children[z * 4 + y * 2 + x] = &pool.emplace_back(OctreeNode{childBox});
+                        children[z * 4 + y * 2 + x] = &pool.emplace_back(OctreeNode{child_box});
                     }
 
             for (const auto& s : objects.spheres)
-                addObject(pool, s, depth);
+                add_object(pool, s, depth);
             for (const auto& t : objects.triangles)
-                addObject(pool, t, depth);
+                add_object(pool, t, depth);
         }
     };
 
     // from: https://github.com/rumpfc/CGG/blob/master/cgg07_Octrees/OctreeNode.cpp
-    void intersectNodeRecursive(const Ray& ray, const OctreeNode& node, Intersection& nearestHit)
+    void intersect_node_recursive(const Ray& ray, const OctreeNode& node, Intersection& nearest_hit)
     {
-        if (node.hasChildren())
+        if (node.has_children())
         {
             const auto& children = node.children();
 
             // iterate on children nearer than our current intersection in the order they are hit by the ray
-            boost::container::static_vector<std::pair<int, float>, 8> childDists;
+            boost::container::static_vector<std::pair<int, float>, 8> child_dists;
             for (int i = 0; i < 8; i++)
-                if (const auto [tmin, tmax] = intersectBox(ray, children[i]->box);
-                    tmin != noHit && tmax > 0 && tmin < nearestHit.distance)
-                    childDists.emplace_back(i, tmin);
-            std::sort(childDists.begin(), childDists.end(), [](auto a, auto b) { return a.second < b.second; });
+                if (const auto [tmin, tmax] = intersect_box(ray, children[i]->box);
+                    tmin != no_hit && tmax > 0 && tmin < nearest_hit.distance)
+                    child_dists.emplace_back(i, tmin);
+            std::sort(child_dists.begin(), child_dists.end(), [](auto a, auto b) { return a.second < b.second; });
 
-            for (const auto [childIndex, childDist] : childDists)
-                intersectNodeRecursive(ray, *children[childIndex], nearestHit);
+            for (const auto [childIndex, childDist] : child_dists)
+                intersect_node_recursive(ray, *children[childIndex], nearest_hit);
         }
         else
         {
             const auto& objects = node.objects();
             for (const auto& sphere : objects.spheres)
                 if (const auto hit = intersect(ray, sphere);
-                    hit.distance != noHit && hit.distance < nearestHit.distance)
-                    nearestHit = hit;
+                    hit.distance != no_hit && hit.distance < nearest_hit.distance)
+                    nearest_hit = hit;
             for (const auto& t : objects.triangles)
-                if (const auto hit = intersect(ray, t); hit.distance != noHit && hit.distance < nearestHit.distance)
-                    nearestHit = hit;
+                if (const auto hit = intersect(ray, t); hit.distance != no_hit && hit.distance < nearest_hit.distance)
+                    nearest_hit = hit;
         }
     }
 
     inline auto intersect(const Ray& ray, const OctreeNode& tree) -> Intersection
     {
-        Intersection nearestHit{};
-        if (intersectBox(ray, tree.box).first != noHit)
-            intersectNodeRecursive(ray, tree, nearestHit);
-        return nearestHit;
+        Intersection nearest_hit{};
+        if (intersect_box(ray, tree.box).first != no_hit)
+            intersect_node_recursive(ray, tree, nearest_hit);
+        return nearest_hit;
     }
 
-    inline auto colorByIntersectionNormal(Intersection hit) -> Image::Pixel
+    inline auto color_by_intersection_normal(Intersection hit) -> Image::Pixel
     {
-        if (hit.distance == noHit)
+        if (hit.distance == no_hit)
             return {}; // black
         Image::Pixel r;
         for (int i = 0; i < 3; i++)
@@ -905,12 +913,12 @@ namespace
         return r;
     }
 
-    auto toFloatColor(Image::Pixel p)
+    auto to_float_color(Image::Pixel p)
     {
         return VectorF{p[0] / 255.0f, p[1] / 255.0f, p[2] / 255.0f};
     };
 
-    auto toInt8Color(VectorF v)
+    auto to_int8_color(VectorF v)
     {
         Image::Pixel p;
         for (int i = 0; i < 3; i++)
@@ -920,10 +928,10 @@ namespace
 
     struct Mipmap
     {
-        Mipmap(Image image)
+        explicit Mipmap(Image image)
         {
             lods.push_back(std::move(image));
-            if (!useMipmaps)
+            if (!use_mipmaps)
                 return;
             while (true)
             {
@@ -938,9 +946,9 @@ namespace
                 {
                     for (auto x = 0; x < lw / 2; x++)
                     {
-                        next(x, y) = toInt8Color(
-                            (toFloatColor(last(x * 2, y * 2)) + toFloatColor(last(x * 2 + 1, y * 2))
-                             + toFloatColor(last(x * 2, y * 2 + 1)) + toFloatColor(last(x * 2 + 1, y * 2 + 1)))
+                        next(x, y) = to_int8_color(
+                            (to_float_color(last(x * 2, y * 2)) + to_float_color(last(x * 2 + 1, y * 2))
+                             + to_float_color(last(x * 2, y * 2 + 1)) + to_float_color(last(x * 2 + 1, y * 2 + 1)))
                             / 4.0f);
                     }
                 }
@@ -951,20 +959,20 @@ namespace
         std::vector<Image> lods;
     };
 
-    auto tex2D(const Image& tex, float u, float v) -> VectorF
+    auto tex2_d(const Image& tex, float u, float v) -> VectorF
     {
         // texture coordinate behavior is repeat
-        auto texCoordToTexelCoord = [](float coord, unsigned int imgSize)
+        auto tex_coord_to_texel_coord = [](float coord, unsigned int img_size)
         {
-            const auto maxIndex = static_cast<float>(imgSize - 1);
-            auto normalizedCoord = coord - static_cast<int>(coord);
-            if (normalizedCoord < 0)
-                normalizedCoord++;
-            return std::clamp(normalizedCoord * maxIndex, 0.0f, maxIndex);
+            const auto max_index = static_cast<float>(img_size - 1);
+            auto normalized_coord = coord - static_cast<int>(coord);
+            if (normalized_coord < 0)
+                normalized_coord++;
+            return std::clamp(normalized_coord * max_index, 0.0f, max_index);
         };
 
-        const float x = texCoordToTexelCoord(u, tex.width());
-        const float y = texCoordToTexelCoord(v, tex.height());
+        const float x = tex_coord_to_texel_coord(u, tex.width());
+        const float y = tex_coord_to_texel_coord(v, tex.height());
 
         //// nearest texel
         // return tex(static_cast<int>(std::round(x)), static_cast<int>(std::round(y)));
@@ -972,25 +980,26 @@ namespace
         // bilinear
         const float x0 = std::floor(x);
         const float x1 = std::ceil(x);
-        const float xFrac = x - static_cast<int>(x);
+        const float x_frac = x - static_cast<int>(x);
         const float y0 = std::floor(y);
         const float y1 = std::ceil(y);
-        const float yFrac = y - static_cast<int>(y);
-        const auto color = (toFloatColor(tex(x0, y0)) * (1 - xFrac) + toFloatColor(tex(x1, y0)) * xFrac) * (1 - yFrac)
-            + (toFloatColor(tex(x0, y1)) * (1 - xFrac) + toFloatColor(tex(x1, y1)) * xFrac) * yFrac;
+        const float y_frac = y - static_cast<int>(y);
+        const auto color
+            = (to_float_color(tex(x0, y0)) * (1 - x_frac) + to_float_color(tex(x1, y0)) * x_frac) * (1 - y_frac)
+            + (to_float_color(tex(x0, y1)) * (1 - x_frac) + to_float_color(tex(x1, y1)) * x_frac) * y_frac;
         return color;
     }
 
-    inline auto colorByTexture(
+    inline auto color_by_texture(
         const std::vector<Mipmap>& mipmaps,
-        VectorF rayDir,
+        VectorF ray_dir,
         float fovy,
         unsigned int height,
         Intersection hit) -> Image::Pixel
     {
-        if (hit.distance == noHit)
+        if (hit.distance == no_hit)
             return {}; // black
-        if (hit.texIndex == -1)
+        if (hit.tex_index == -1)
         {
             // sphere hits are colored by normal
             Image::Pixel r;
@@ -1000,30 +1009,30 @@ namespace
         }
 
         // triangle hits are colored by texture
-        const auto& mipmap = mipmaps[hit.texIndex];
-        if (!useMipmaps)
-            return toInt8Color(tex2D(mipmap.lods.front(), hit.texU, hit.texV));
+        const auto& mipmap = mipmaps[hit.tex_index];
+        if (!use_mipmaps)
+            return to_int8_color(tex2_d(mipmap.lods.front(), hit.tex_u, hit.tex_v));
 
         // ray cones lod computation from Ray Tracing Gems chapter 20
         const auto alpha = std::atan(2.0f * tan(fovy / 2.0f) / static_cast<float>(height)); // ray spread angle estimate
-        const auto lodCones = std::log(alpha * hit.distance * (1.0f / std::abs(dot(hit.normal, rayDir))));
+        const auto lod_cones = std::log(alpha * hit.distance * (1.0f / std::abs(dot(hit.normal, ray_dir))));
 
-        const auto lodClamped = std::clamp(hit.baseLod + lodCones, 0.0f, static_cast<float>(mipmap.lods.size() - 1));
-        float lodInteg;
-        const auto lodFrac = std::modf(lodClamped, &lodInteg);
-        const auto floorTex = static_cast<unsigned>(lodInteg);
-        const auto color1 = tex2D(mipmap.lods[floorTex], hit.texU, hit.texV);
-        if (floorTex == mipmap.lods.size() - 1)
-            return toInt8Color(color1);
-        const auto color2 = tex2D(mipmap.lods[floorTex + 1], hit.texU, hit.texV);
-        return toInt8Color(color1 * (1.0f - lodFrac) + color2 * lodFrac);
+        const auto lod_clamped = std::clamp(hit.base_lod + lod_cones, 0.0f, static_cast<float>(mipmap.lods.size() - 1));
+        float lod_integ;
+        const auto lod_frac = std::modf(lod_clamped, &lod_integ);
+        const auto floor_tex = static_cast<unsigned>(lod_integ);
+        const auto color1 = tex2_d(mipmap.lods[floor_tex], hit.tex_u, hit.tex_v);
+        if (floor_tex == mipmap.lods.size() - 1)
+            return to_int8_color(color1);
+        const auto color2 = tex2_d(mipmap.lods[floor_tex + 1], hit.tex_u, hit.tex_v);
+        return to_int8_color(color1 * (1.0f - lod_frac) + color2 * lod_frac);
     }
 
     struct Scene
     {
         Camera camera;
         OctreeNode tree;
-        std::deque<OctreeNode> nodePool;
+        std::deque<OctreeNode> node_pool;
         std::vector<Mipmap> mipmaps;
     };
 
@@ -1035,18 +1044,18 @@ namespace
         {
             for (auto x = 0u; x < width; x++)
             {
-                const auto ray = createRay(scene.camera, width, height, x, height - 1 - y); // flip
-                const auto nearestHit = intersect(ray, scene.tree);
-                img(x, y) = colorByTexture(scene.mipmaps, ray.direction, scene.camera.fovy, height, nearestHit);
+                const auto ray = create_ray(scene.camera, width, height, x, height - 1 - y); // flip
+                const auto nearest_hit = intersect(ray, scene.tree);
+                img(x, y) = color_by_texture(scene.mipmaps, ray.direction, scene.camera.fovy, height, nearest_hit);
             }
         }
 
         return img;
     }
 
-    inline auto lookAt(float fovy, VectorF pos, VectorF lookAt, VectorF up) -> Camera
+    inline auto look_at(float fovy, VectorF pos, VectorF look_at, VectorF up) -> Camera
     {
-        const auto view = (lookAt - pos).normalized();
+        const auto view = (look_at - pos).normalized();
         const auto right = cross(view, up);
         const auto up2 = cross(right, view).normalized();
         return Camera{fovy, pos, view, up2};
@@ -1054,11 +1063,11 @@ namespace
 
     // computes basic level of detail from triangle and texture area, cf. ray cones lod computation from Ray Tracing
     // Gems chapter 20
-    auto computeBaseLod(const Triangle& t, const std::vector<Mipmap>& mipmaps) -> float
+    auto compute_base_lod(const Triangle& t, const std::vector<Mipmap>& mipmaps) -> float
     {
-        if (t.texIndex == -1)
+        if (t.tex_index == -1)
             return 0.0f;
-        const auto& tex = mipmaps[t.texIndex].lods.front();
+        const auto& tex = mipmaps[t.tex_index].lods.front();
         const auto ta = tex.width() * tex.height()
             * std::abs((t[1].u - t[0].u) * (t[2].v - t[0].v) - (t[2].u - t[0].u) * (t[1].v - t[0].v));
         const auto pa = cross(t[1].pos - t[0].pos, t[2].pos - t[0].pos).length();
@@ -1073,8 +1082,8 @@ namespace
             t[2].pos - t[0].pos,
             {t[0].u, t[1].u, t[2].u},
             {t[0].v, t[1].v, t[2].v},
-            t.texIndex,
-            computeBaseLod(t, mipmaps)};
+            t.tex_index,
+            compute_base_lod(t, mipmaps)};
     }
 
     // auto cubicBallsScene() -> Scene
@@ -1142,7 +1151,7 @@ namespace
     //    return scene;
     //}
 
-    auto sponzaScene(const std::filesystem::path objFile) -> Scene
+    auto sponza_scene(const std::filesystem::path objFile) -> Scene
     {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
@@ -1166,9 +1175,9 @@ namespace
             throw std::runtime_error{"Failed to load sponza scene"};
 
         Scene scene;
-        scene.camera = lookAt(45, {200, 100, 0}, {0, 100, 0}, {0, 1, 0});
+        scene.camera = look_at(45, {200, 100, 0}, {0, 100, 0}, {0, 1, 0});
 
-        std::unordered_map<std::string, int> textureToIndex;
+        std::unordered_map<std::string, int> texture_to_index;
 
         std::vector<Triangle> triangles;
         constexpr auto l = std::numeric_limits<float>::max();
@@ -1180,32 +1189,32 @@ namespace
         {
             const auto& mesh = shape.mesh;
 
-            size_t indexOffset = 0;
+            size_t index_offset = 0;
             for (auto f = 0; f < mesh.num_face_vertices.size(); f++)
             {
-                const auto texIndex = [&]
+                const auto tex_index = [texture_to_index]
                 {
-                    const auto matId = mesh.material_ids[f];
-                    if (matId == -1)
+                    const auto mat_id = mesh.material_ids[f];
+                    if (mat_id == -1)
                         return -1;
-                    const auto texName = materials.at(matId).diffuse_texname;
-                    if (texName == "")
+                    const auto tex_name = materials.at(mat_id).diffuse_texname;
+                    if (tex_name == "")
                         return -1;
-                    if (const auto it = textureToIndex.find(texName); it != end(textureToIndex))
+                    if (const auto it = texture_to_index.find(tex_name); it != end(texture_to_index))
                         return it->second;
-                    const auto texIndex = static_cast<int>(scene.mipmaps.size());
-                    textureToIndex[texName] = texIndex;
-                    scene.mipmaps.push_back(Mipmap{Image{objFile.parent_path() / texName}});
-                    return texIndex;
+                    const auto tex_index = static_cast<int>(scene.mipmaps.size());
+                    texture_to_index[tex_name] = tex_index;
+                    scene.mipmaps.push_back(Mipmap{Image{objFile.parent_path() / tex_name}});
+                    return tex_index;
                 }();
 
-                const auto vertexCount = mesh.num_face_vertices[f];
-                if (vertexCount == 3)
+                const auto vertex_count = mesh.num_face_vertices[f];
+                if (vertex_count == 3)
                 {
                     Triangle t;
                     for (const auto v : {0, 1, 2})
                     {
-                        const tinyobj::index_t idx = mesh.indices[indexOffset + v];
+                        const tinyobj::index_t idx = mesh.indices[index_offset + v];
                         for (const auto c : {0, 1, 2})
                         {
                             t[v].pos[c] = attrib.vertices[3 * idx.vertex_index + c];
@@ -1215,7 +1224,7 @@ namespace
                         t[v].u = attrib.texcoords[2 * idx.texcoord_index + 0];
                         t[v].v = attrib.texcoords[2 * idx.texcoord_index + 1];
                     }
-                    t.texIndex = texIndex;
+                    t.tex_index = tex_index;
                     triangles.push_back(t);
                     // const auto pt = prepare(t);
                     // scene.triangles[write](Vertex0{}, X{}) = pt.vertex0[0];
@@ -1229,7 +1238,7 @@ namespace
                     // scene.triangles[write](Edge2{}, Z{}) = pt.edge2[2];
                     // write++;
                 }
-                indexOffset += vertexCount;
+                index_offset += vertex_count;
             }
         }
 
@@ -1246,18 +1255,18 @@ namespace
                   << "KiB)\n";
 
         scene.tree = OctreeNode{box};
-        scene.tree.addObject(scene.nodePool, sphere1);
-        scene.tree.addObject(scene.nodePool, sphere2);
+        scene.tree.add_object(scene.node_pool, sphere1);
+        scene.tree.add_object(scene.node_pool, sphere2);
         for (const auto& t : triangles)
         {
             const auto pt = prepare(t, scene.mipmaps);
-            if constexpr (useStdVectorForTriangles)
-                scene.tree.addObject(scene.nodePool, pt);
+            if constexpr (use_std_vector_for_triangles)
+                scene.tree.add_object(scene.node_pool, pt);
             else
             {
-                llama::One<PrepTriangle> llamaPt;
-                llamaPt.store(pt);
-                scene.tree.addObject(scene.nodePool, llamaPt);
+                llama::One<PrepTriangle> llama_pt;
+                llama_pt.store(pt);
+                scene.tree.add_object(scene.node_pool, llama_pt);
             }
         }
 
@@ -1265,27 +1274,27 @@ namespace
     }
 
     template <typename F>
-    void visitNodes(const OctreeNode& node, const F& f)
+    void visit_nodes(const OctreeNode& node, const F& f)
     {
         f(node);
-        if (node.hasChildren())
+        if (node.has_children())
             for (const auto& child : node.children())
-                visitNodes(*child, f);
+                visit_nodes(*child, f);
     }
 
-    void printMemoryFootprint(const Scene& scene)
+    void print_memory_footprint(const Scene& scene)
     {
-        std::size_t triangleCount = 0;
+        std::size_t triangle_count = 0;
         std::size_t nodeCount = 0;
-        visitNodes(
+        visit_nodes(
             scene.tree,
-            [&](const OctreeNode& node)
+            [triangle_count](const OctreeNode& node)
             {
                 nodeCount++;
-                if (!node.hasChildren())
-                    triangleCount += node.objects().triangles.size();
+                if (!node.has_children())
+                    triangle_count += node.objects().triangles.size();
             });
-        std::cout << "Tree stores " << triangleCount << " triangles (" << (triangleCount * sizeof(Triangle)) / 1024
+        std::cout << "Tree stores " << triangle_count << " triangles (" << (triangle_count * sizeof(Triangle)) / 1024
                   << "KiB) in " << nodeCount << " nodes (" << (nodeCount * sizeof(OctreeNode)) / 1024 << "KiB) \n";
     }
 } // namespace
@@ -1308,9 +1317,9 @@ try
         return 1;
     }
     Stopwatch watch;
-    const auto scene = sponzaScene(argv[1]);
+    const auto scene = sponza_scene(argv[1]);
     watch.printAndReset("Loading");
-    printMemoryFootprint(scene);
+    print_memory_footprint(scene);
     watch.printAndReset("Visit  ");
 
     double avg = 0;
