@@ -16,8 +16,8 @@ TEST_CASE("mapping.concepts")
 TEST_CASE("address.AoS")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::AoS<ArrayDims, Particle>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping = llama::mapping::AoS<ArrayDims, Particle>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -68,9 +68,9 @@ TEST_CASE("address.AoS")
 TEST_CASE("address.AoS.fortran")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
+    auto array_dims = ArrayDims{16, 16};
     auto mapping
-        = llama::mapping::AoS<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsFortran>{arrayDims};
+        = llama::mapping::AoS<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsFortran>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -121,8 +121,9 @@ TEST_CASE("address.AoS.fortran")
 TEST_CASE("address.AoS.morton")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::AoS<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsMorton>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping
+        = llama::mapping::AoS<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsMorton>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -173,8 +174,8 @@ TEST_CASE("address.AoS.morton")
 TEST_CASE("address.AoS.aligned")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::AoS<ArrayDims, Particle, true>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping = llama::mapping::AoS<ArrayDims, Particle, true>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -225,8 +226,8 @@ TEST_CASE("address.AoS.aligned")
 TEST_CASE("address.SoA")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::SoA<ArrayDims, Particle>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping = llama::mapping::SoA<ArrayDims, Particle>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -277,9 +278,9 @@ TEST_CASE("address.SoA")
 TEST_CASE("address.SoA.fortran")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
+    auto array_dims = ArrayDims{16, 16};
     auto mapping
-        = llama::mapping::SoA<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsFortran>{arrayDims};
+        = llama::mapping::SoA<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsFortran>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -334,8 +335,9 @@ TEST_CASE("address.SoA.morton")
     };
 
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::SoA<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsMorton>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping
+        = llama::mapping::SoA<ArrayDims, Particle, false, llama::mapping::LinearizeArrayDimsMorton>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -386,8 +388,8 @@ TEST_CASE("address.SoA.morton")
 TEST_CASE("address.SoA.MultiBlob")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::SoA<ArrayDims, Particle, true>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping = llama::mapping::SoA<ArrayDims, Particle, true>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};
@@ -438,8 +440,8 @@ TEST_CASE("address.SoA.MultiBlob")
 TEST_CASE("address.AoSoA.4")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    auto arrayDims = ArrayDims{16, 16};
-    auto mapping = llama::mapping::AoSoA<ArrayDims, Particle, 4>{arrayDims};
+    auto array_dims = ArrayDims{16, 16};
+    auto mapping = llama::mapping::AoSoA<ArrayDims, Particle, 4>{array_dims};
 
     {
         const auto coord = ArrayDims{0, 0};

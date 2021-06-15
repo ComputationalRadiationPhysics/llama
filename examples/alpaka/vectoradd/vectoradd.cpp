@@ -16,11 +16,11 @@
 #include <random>
 #include <utility>
 
-constexpr auto MAPPING
+constexpr auto mapping
     = 1; ///< 0 native AoS, 1 native SoA, 2 native SoA (separate blobs, does not work yet), 3 tree AoS, 4 tree SoA
-constexpr auto PROBLEM_SIZE = 64 * 1024 * 1024;
-constexpr auto BLOCK_SIZE = 256;
-constexpr auto STEPS = 10;
+constexpr auto problem_size = 64 * 1024 * 1024;
+constexpr auto block_size = 256;
+constexpr auto steps = 10;
 
 using FP = float;
 
@@ -38,16 +38,16 @@ using Vector = llama::Record<
     llama::Field<tag::Z, FP>>;
 // clang-format on
 
-template <std::size_t ProblemSize, std::size_t Elems>
+template <std::size_t TProblemSize, std::size_t TElems>
 struct AddKernel
 {
-    template <typename Acc, typename View>
-    LLAMA_FN_HOST_ACC_INLINE void operator()(const Acc& acc, View a, View b) const
+    template <typename TAcc, typename TView>
+    LLAMA_FN_HOST_ACC_INLINE void operator()(const TAcc& acc, TView a, TView b) const
     {
         const auto ti = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc)[0];
 
-        const auto start = ti * Elems;
-        const auto end = alpaka::math::min(acc, start + Elems, ProblemSize);
+        const auto start = ti * TElems;
+        const auto end = alpaka::math::min(acc, start + TElems, TProblemSize);
 
         LLAMA_INDEPENDENT_DATA
         for (auto i = start; i < end; ++i)
@@ -75,50 +75,50 @@ try
     using PltfHost = alpaka::Pltf<DevHost>;
     using PltfAcc = alpaka::Pltf<DevAcc>;
     using Queue = alpaka::Queue<DevAcc, alpaka::Blocking>;
-    const DevAcc devAcc(alpaka::getDevByIdx<PltfAcc>(0u));
-    const DevHost devHost(alpaka::getDevByIdx<PltfHost>(0u));
-    Queue queue(devAcc);
+    const DevAcc dev_acc(alpaka::getDevByIdx<PltfAcc>(0u));
+    const DevHost dev_host(alpaka::getDevByIdx<PltfHost>(0u));
+    Queue queue(dev_acc);
 
     // LLAMA
-    const auto arrayDims = llama::ArrayDims{PROBLEM_SIZE};
+    const auto array_dims = llama::ArrayDims{problem_size};
 
-    const auto mapping = [&]
+    const auto mapping = [array_dims]
     {
-        if constexpr (MAPPING == 0)
-            return llama::mapping::AoS{arrayDims, Vector{}};
-        if constexpr (MAPPING == 1)
-            return llama::mapping::SoA{arrayDims, Vector{}};
-        if constexpr (MAPPING == 2)
-            return llama::mapping::SoA<decltype(arrayDims), Vector, true>{arrayDims};
-        if constexpr (MAPPING == 3)
-            return llama::mapping::tree::Mapping{arrayDims, llama::Tuple{}, Vector{}};
-        if constexpr (MAPPING == 4)
+        if constexpr (mapping == 0)
+            return llama::mapping::AoS{array_dims, Vector{}};
+        if constexpr (mapping == 1)
+            return llama::mapping::SoA{array_dims, Vector{}};
+        if constexpr (mapping == 2)
+            return llama::mapping::SoA<decltype(array_dims), Vector, true>{array_dims};
+        if constexpr (mapping == 3)
+            return llama::mapping::tree::Mapping{array_dims, llama::Tuple{}, Vector{}};
+        if constexpr (mapping == 4)
             return llama::mapping::tree::Mapping{
-                arrayDims,
+                array_dims,
                 llama::Tuple{llama::mapping::tree::functor::LeafOnlyRT()},
                 Vector{}};
     }();
 
-    std::cout << PROBLEM_SIZE / 1000 / 1000 << " million vectors\n"
-              << PROBLEM_SIZE * llama::sizeOf<Vector> * 2 / 1000 / 1000 << " MB on device\n";
+    std::cout << problem_size / 1000 / 1000 << " million vectors\n"
+              << problem_size * llama::sizeOf<Vector> * 2 / 1000 / 1000 << " MB on device\n";
 
     Stopwatch chrono;
 
-    const auto bufferSize = Size(mapping.blobSize(0));
+    const auto buffer_size = Size(mapping.blobSize(0));
 
     // allocate buffers
-    auto hostBufferA = alpaka::allocBuf<std::byte, Size>(devHost, bufferSize);
-    auto hostBufferB = alpaka::allocBuf<std::byte, Size>(devHost, bufferSize);
-    auto devBufferA = alpaka::allocBuf<std::byte, Size>(devAcc, bufferSize);
-    auto devBufferB = alpaka::allocBuf<std::byte, Size>(devAcc, bufferSize);
+    auto host_buffer_a = alpaka::allocBuf<std::byte, Size>(dev_host, buffer_size);
+    auto host_buffer_b = alpaka::allocBuf<std::byte, Size>(dev_host, buffer_size);
+    auto dev_buffer_a = alpaka::allocBuf<std::byte, Size>(dev_acc, buffer_size);
+    auto dev_buffer_b = alpaka::allocBuf<std::byte, Size>(dev_acc, buffer_size);
 
     chrono.printAndReset("Alloc");
 
     // create LLAMA views
-    auto hostA = llama::View{mapping, llama::Array{alpaka::getPtrNative(hostBufferA)}};
-    auto hostB = llama::View{mapping, llama::Array{alpaka::getPtrNative(hostBufferB)}};
-    auto devA = llama::View{mapping, llama::Array{alpaka::getPtrNative(devBufferA)}};
-    auto devB = llama::View{mapping, llama::Array{alpaka::getPtrNative(devBufferB)}};
+    auto host_a = llama::View{mapping, llama::Array{alpaka::getPtrNative(host_buffer_a)}};
+    auto host_b = llama::View{mapping, llama::Array{alpaka::getPtrNative(host_buffer_b)}};
+    auto dev_a = llama::View{mapping, llama::Array{alpaka::getPtrNative(dev_buffer_a)}};
+    auto dev_b = llama::View{mapping, llama::Array{alpaka::getPtrNative(dev_buffer_b)}};
 
     chrono.printAndReset("Views");
 
@@ -126,37 +126,37 @@ try
     std::normal_distribution<FP> distribution(FP(0), FP(1));
     auto seed = distribution(generator);
     LLAMA_INDEPENDENT_DATA
-    for (std::size_t i = 0; i < PROBLEM_SIZE; ++i)
+    for (std::size_t i = 0; i < problem_size; ++i)
     {
-        hostA(i) = seed + i;
-        hostB(i) = seed - i;
+        host_a(i) = seed + i;
+        host_b(i) = seed - i;
     }
     chrono.printAndReset("Init");
 
-    alpaka::memcpy(queue, devBufferA, hostBufferA, bufferSize);
-    alpaka::memcpy(queue, devBufferB, hostBufferB, bufferSize);
+    alpaka::memcpy(queue, dev_buffer_a, host_buffer_a, buffer_size);
+    alpaka::memcpy(queue, dev_buffer_b, host_buffer_b, buffer_size);
 
     chrono.printAndReset("Copy H->D");
 
-    constexpr std::size_t hardwareThreads = 2; // relevant for OpenMP2Threads
-    using Distribution = common::ThreadsElemsDistribution<Acc, BLOCK_SIZE, hardwareThreads>;
-    constexpr std::size_t elemCount = Distribution::elemCount;
-    constexpr std::size_t threadCount = Distribution::threadCount;
-    const alpaka::Vec<Dim, Size> elems(static_cast<Size>(elemCount));
-    const alpaka::Vec<Dim, Size> threads(static_cast<Size>(threadCount));
-    constexpr auto innerCount = elemCount * threadCount;
-    const alpaka::Vec<Dim, Size> blocks(static_cast<Size>((PROBLEM_SIZE + innerCount - 1) / innerCount));
+    constexpr std::size_t hardware_threads = 2; // relevant for OpenMP2Threads
+    using Distribution = common::ThreadsElemsDistribution<Acc, block_size, hardware_threads>;
+    constexpr std::size_t elem_count = Distribution::elemCount;
+    constexpr std::size_t thread_count = Distribution::threadCount;
+    const alpaka::Vec<Dim, Size> elems(static_cast<Size>(elem_count));
+    const alpaka::Vec<Dim, Size> threads(static_cast<Size>(thread_count));
+    constexpr auto inner_count = elem_count * thread_count;
+    const alpaka::Vec<Dim, Size> blocks(static_cast<Size>((problem_size + inner_count - 1) / inner_count));
 
     const auto workdiv = alpaka::WorkDivMembers<Dim, Size>{blocks, threads, elems};
 
-    for (std::size_t s = 0; s < STEPS; ++s)
+    for (std::size_t s = 0; s < steps; ++s)
     {
-        alpaka::exec<Acc>(queue, workdiv, AddKernel<PROBLEM_SIZE, elemCount>{}, devA, devB);
+        alpaka::exec<Acc>(queue, workdiv, AddKernel<problem_size, elem_count>{}, dev_a, dev_b);
         chrono.printAndReset("Add kernel");
     }
 
-    alpaka::memcpy(queue, hostBufferA, devBufferA, bufferSize);
-    alpaka::memcpy(queue, hostBufferB, devBufferB, bufferSize);
+    alpaka::memcpy(queue, host_buffer_a, dev_buffer_a, buffer_size);
+    alpaka::memcpy(queue, host_buffer_b, dev_buffer_b, buffer_size);
 
     chrono.printAndReset("Copy D->H");
 

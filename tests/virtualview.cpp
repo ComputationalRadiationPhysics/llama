@@ -3,96 +3,96 @@
 #include <catch2/catch.hpp>
 #include <llama/llama.hpp>
 
-template <typename VirtualRecord>
+template <typename TVirtualRecord>
 struct DoubleFunctor
 {
-    template <typename Coord>
-    void operator()(Coord coord)
+    template <typename TCoord>
+    void operator()(TCoord coord)
     {
         vd(coord) *= 2;
     }
-    VirtualRecord vd;
+    TVirtualRecord vd;
 };
 
 TEST_CASE("virtual view CTAD")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    constexpr ArrayDims viewSize{10, 10};
-    auto view = allocView(llama::mapping::SoA<ArrayDims, Particle>(viewSize));
+    constexpr ArrayDims view_size{10, 10};
+    auto view = allocView(llama::mapping::SoA<ArrayDims, Particle>(view_size));
 
-    llama::VirtualView virtualView{view, {2, 4}};
+    llama::VirtualView virtual_view{view, {2, 4}};
 }
 
 TEST_CASE("fast virtual view")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    constexpr ArrayDims viewSize{10, 10};
+    constexpr ArrayDims view_size{10, 10};
 
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    auto view = allocView(Mapping(viewSize));
+    auto view = allocView(Mapping(view_size));
 
-    for (std::size_t x = 0; x < viewSize[0]; ++x)
-        for (std::size_t y = 0; y < viewSize[1]; ++y)
+    for (std::size_t x = 0; x < view_size[0]; ++x)
+        for (std::size_t y = 0; y < view_size[1]; ++y)
             view(x, y) = x * y;
 
-    llama::VirtualView<decltype(view)> virtualView{view, {2, 4}};
+    llama::VirtualView<decltype(view)> virtual_view{view, {2, 4}};
 
-    CHECK(virtualView.offset == ArrayDims{2, 4});
+    CHECK(virtual_view.offset == ArrayDims{2, 4});
 
-    CHECK(view(virtualView.offset)(tag::Pos(), tag::X()) == 8.0);
-    CHECK(virtualView({0, 0})(tag::Pos(), tag::X()) == 8.0);
+    CHECK(view(virtual_view.offset)(tag::Pos(), tag::X()) == 8.0);
+    CHECK(virtual_view({0, 0})(tag::Pos(), tag::X()) == 8.0);
 
-    CHECK(view({virtualView.offset[0] + 2, virtualView.offset[1] + 3})(tag::Vel(), tag::Z()) == 28.0);
-    CHECK(virtualView({2, 3})(tag::Vel(), tag::Z()) == 28.0);
+    CHECK(view({virtual_view.offset[0] + 2, virtual_view.offset[1] + 3})(tag::Vel(), tag::Z()) == 28.0);
+    CHECK(virtual_view({2, 3})(tag::Vel(), tag::Z()) == 28.0);
 }
 
 TEST_CASE("virtual view")
 {
     using ArrayDims = llama::ArrayDims<2>;
-    constexpr ArrayDims viewSize{32, 32};
-    constexpr ArrayDims miniSize{8, 8};
+    constexpr ArrayDims view_size{32, 32};
+    constexpr ArrayDims mini_size{8, 8};
     using Mapping = llama::mapping::SoA<ArrayDims, Particle>;
-    auto view = allocView(Mapping(viewSize));
+    auto view = allocView(Mapping(view_size));
 
-    for (std::size_t x = 0; x < viewSize[0]; ++x)
-        for (std::size_t y = 0; y < viewSize[1]; ++y)
+    for (std::size_t x = 0; x < view_size[0]; ++x)
+        for (std::size_t y = 0; y < view_size[1]; ++y)
             view(x, y) = x * y;
 
     constexpr ArrayDims iterations{
-        (viewSize[0] + miniSize[0] - 1) / miniSize[0],
-        (viewSize[1] + miniSize[1] - 1) / miniSize[1]};
+        (view_size[0] + mini_size[0] - 1) / mini_size[0],
+        (view_size[1] + mini_size[1] - 1) / mini_size[1]};
 
     for (std::size_t x = 0; x < iterations[0]; ++x)
         for (std::size_t y = 0; y < iterations[1]; ++y)
         {
-            const ArrayDims validMiniSize{
-                (x < iterations[0] - 1) ? miniSize[0] : (viewSize[0] - 1) % miniSize[0] + 1,
-                (y < iterations[1] - 1) ? miniSize[1] : (viewSize[1] - 1) % miniSize[1] + 1};
+            const ArrayDims valid_mini_size{
+                (x < iterations[0] - 1) ? mini_size[0] : (view_size[0] - 1) % mini_size[0] + 1,
+                (y < iterations[1] - 1) ? mini_size[1] : (view_size[1] - 1) % mini_size[1] + 1};
 
-            llama::VirtualView<decltype(view)> virtualView(view, {x * miniSize[0], y * miniSize[1]});
+            llama::VirtualView<decltype(view)> virtual_view(view, {x * mini_size[0], y * mini_size[1]});
 
             using MiniMapping = llama::mapping::SoA<ArrayDims, Particle>;
-            auto miniView = allocView(
-                MiniMapping(miniSize),
-                llama::bloballoc::Stack<miniSize[0] * miniSize[1] * llama::sizeOf<Particle>>{});
+            auto mini_view = allocView(
+                MiniMapping(mini_size),
+                llama::bloballoc::Stack<mini_size[0] * mini_size[1] * llama::sizeOf<Particle>>{});
 
-            for (std::size_t a = 0; a < validMiniSize[0]; ++a)
-                for (std::size_t b = 0; b < validMiniSize[1]; ++b)
-                    miniView(a, b) = virtualView(a, b);
+            for (std::size_t a = 0; a < valid_mini_size[0]; ++a)
+                for (std::size_t b = 0; b < valid_mini_size[1]; ++b)
+                    mini_view(a, b) = virtual_view(a, b);
 
-            for (std::size_t a = 0; a < validMiniSize[0]; ++a)
-                for (std::size_t b = 0; b < validMiniSize[1]; ++b)
+            for (std::size_t a = 0; a < valid_mini_size[0]; ++a)
+                for (std::size_t b = 0; b < valid_mini_size[1]; ++b)
                 {
-                    DoubleFunctor<decltype(miniView(a, b))> sqrtF{miniView(a, b)};
-                    llama::forEachLeaf<Particle>(sqrtF);
+                    DoubleFunctor<decltype(mini_view(a, b))> sqrt_f{mini_view(a, b)};
+                    llama::forEachLeaf<Particle>(sqrt_f);
                 }
 
-            for (std::size_t a = 0; a < validMiniSize[0]; ++a)
-                for (std::size_t b = 0; b < validMiniSize[1]; ++b)
-                    virtualView(a, b) = miniView(a, b);
+            for (std::size_t a = 0; a < valid_mini_size[0]; ++a)
+                for (std::size_t b = 0; b < valid_mini_size[1]; ++b)
+                    virtual_view(a, b) = mini_view(a, b);
         }
 
-    for (std::size_t x = 0; x < viewSize[0]; ++x)
-        for (std::size_t y = 0; y < viewSize[1]; ++y)
+    for (std::size_t x = 0; x < view_size[0]; ++x)
+        for (std::size_t y = 0; y < view_size[1]; ++y)
             CHECK((view(x, y)) == x * y * 2);
 }

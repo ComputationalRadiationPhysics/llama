@@ -19,10 +19,10 @@ using Position = llama::Record<
 
 TEST_CASE("iterator")
 {
-    auto test = [](auto arrayDims)
+    auto test = [](auto array_dims)
     {
-        using ArrayDims = decltype(arrayDims);
-        auto mapping = llama::mapping::AoS<ArrayDims, Position>{arrayDims};
+        using ArrayDims = decltype(array_dims);
+        auto mapping = llama::mapping::AoS<ArrayDims, Position>{array_dims};
         auto view = llama::allocView(mapping);
 
         for (auto vd : view)
@@ -33,9 +33,9 @@ TEST_CASE("iterator")
         }
         std::transform(begin(view), end(view), begin(view), [](auto vd) { return vd * 2; });
         const auto& cview = std::as_const(view);
-        const int sumY
+        const int sum_y
             = std::accumulate(begin(cview), end(cview), 0, [](int acc, auto vd) { return acc + vd(tag::Y{}); });
-        CHECK(sumY == 128);
+        CHECK(sum_y == 128);
     };
     test(llama::ArrayDims{32});
     test(llama::ArrayDims{4, 8});
@@ -44,21 +44,21 @@ TEST_CASE("iterator")
 
 TEST_CASE("iterator.std_copy")
 {
-    auto test = [](auto arrayDims)
+    auto test = [](auto array_dims)
     {
-        auto aosView = llama::allocView(llama::mapping::AoS{arrayDims, Position{}});
-        auto soaView = llama::allocView(llama::mapping::SoA{arrayDims, Position{}});
+        auto aos_view = llama::allocView(llama::mapping::AoS{array_dims, Position{}});
+        auto soa_view = llama::allocView(llama::mapping::SoA{array_dims, Position{}});
 
         int i = 0;
-        for (auto vd : aosView)
+        for (auto vd : aos_view)
         {
             vd(tag::X{}) = ++i;
             vd(tag::Y{}) = ++i;
             vd(tag::Z{}) = ++i;
         }
-        std::copy(begin(aosView), end(aosView), begin(soaView));
+        std::copy(begin(aos_view), end(aos_view), begin(soa_view));
         i = 0;
-        for (auto vd : soaView)
+        for (auto vd : soa_view)
         {
             CHECK(vd(tag::X{}) == ++i);
             CHECK(vd(tag::Y{}) == ++i);
@@ -72,19 +72,19 @@ TEST_CASE("iterator.std_copy")
 
 TEST_CASE("iterator.transform_reduce")
 {
-    auto test = [](auto arrayDims)
+    auto test = [](auto array_dims)
     {
-        auto aosView = llama::allocView(llama::mapping::AoS{arrayDims, Position{}});
-        auto soaView = llama::allocView(llama::mapping::SoA{arrayDims, Position{}});
+        auto aos_view = llama::allocView(llama::mapping::AoS{array_dims, Position{}});
+        auto soa_view = llama::allocView(llama::mapping::SoA{array_dims, Position{}});
 
         int i = 0;
-        for (auto vd : aosView)
+        for (auto vd : aos_view)
         {
             vd(tag::X{}) = ++i;
             vd(tag::Y{}) = ++i;
             vd(tag::Z{}) = ++i;
         }
-        for (auto vd : soaView)
+        for (auto vd : soa_view)
         {
             vd(tag::X{}) = ++i;
             vd(tag::Y{}) = ++i;
@@ -92,7 +92,7 @@ TEST_CASE("iterator.transform_reduce")
         }
         // returned type is a llama::One<Position>
         auto [sumX, sumY, sumZ]
-            = std::transform_reduce(begin(aosView), end(aosView), begin(soaView), llama::One<Position>{});
+            = std::transform_reduce(begin(aos_view), end(aos_view), begin(soa_view), llama::One<Position>{});
 
         CHECK(sumX == 242672);
         CHECK(sumY == 248816);
@@ -113,21 +113,21 @@ TEST_CASE("iterator.different_record_dim")
     };
     using WrappedPos = llama::Record<llama::Field<Pos1, Position>, llama::Field<Pos2, Position>>;
 
-    auto arrayDims = llama::ArrayDims{32};
-    auto aosView = llama::allocView(llama::mapping::AoS{arrayDims, WrappedPos{}});
-    auto soaView = llama::allocView(llama::mapping::SoA{arrayDims, Position{}});
+    auto array_dims = llama::ArrayDims{32};
+    auto aos_view = llama::allocView(llama::mapping::AoS{array_dims, WrappedPos{}});
+    auto soa_view = llama::allocView(llama::mapping::SoA{array_dims, Position{}});
 
     int i = 0;
-    for (auto vd : aosView)
+    for (auto vd : aos_view)
     {
         vd(Pos1{}, tag::X{}) = ++i;
         vd(Pos1{}, tag::Y{}) = ++i;
         vd(Pos1{}, tag::Z{}) = ++i;
     }
-    std::transform(begin(aosView), end(aosView), begin(soaView), [](auto wp) { return wp(Pos1{}) * 2; });
+    std::transform(begin(aos_view), end(aos_view), begin(soa_view), [](auto wp) { return wp(Pos1{}) * 2; });
 
     i = 0;
-    for (auto vd : soaView)
+    for (auto vd : soa_view)
     {
         CHECK(vd(tag::X{}) == ++i * 2);
         CHECK(vd(tag::Y{}) == ++i * 2);
@@ -135,7 +135,7 @@ TEST_CASE("iterator.different_record_dim")
     }
 }
 
-// TODO: clang 10 and 11 fail to compile this currently with the issue described here:
+// TODO(bgruber): clang 10 and 11 fail to compile this currently with the issue described here:
 // https://stackoverflow.com/questions/64300832/why-does-clang-think-gccs-subrange-does-not-satisfy-gccs-ranges-begin-functi
 // let's try again with clang 12
 // Intel LLVM compiler is also using the clang frontend

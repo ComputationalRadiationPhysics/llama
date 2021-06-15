@@ -88,7 +88,7 @@ TEST_CASE("vector.move_assign")
 
 namespace
 {
-    auto iotaVec(std::size_t count)
+    auto iota_vec(std::size_t count)
     {
         Vector v(count);
         for (auto i = 0; i < count; i++)
@@ -102,7 +102,7 @@ TEST_CASE("vector.swap")
     llama::One<RecordDim> p{21};
     Vector v1(5, p);
 
-    auto v2 = iotaVec(10);
+    auto v2 = iota_vec(10);
 
     swap(v1, v2);
 
@@ -114,7 +114,7 @@ TEST_CASE("vector.swap")
 
 TEST_CASE("vector.subscript")
 {
-    auto v = iotaVec(10);
+    auto v = iota_vec(10);
     for (auto i = 0; i < 10; i++)
         CHECK(v[i] == i);
     for (auto i = 0; i < 10; i++)
@@ -124,19 +124,19 @@ TEST_CASE("vector.subscript")
 
 TEST_CASE("vector.front")
 {
-    auto v = iotaVec(10);
+    auto v = iota_vec(10);
     CHECK(v.front() == 0);
 }
 
 TEST_CASE("vector.back")
 {
-    auto v = iotaVec(10);
+    auto v = iota_vec(10);
     CHECK(v.back() == 9);
 }
 
 TEST_CASE("vector.begin_end")
 {
-    auto v = iotaVec(10);
+    auto v = iota_vec(10);
     auto b = v.begin();
     auto e = v.end();
     CHECK(*b == 0);
@@ -152,7 +152,7 @@ TEST_CASE("vector.begin_end")
 
 TEST_CASE("vector.cbegin_cend")
 {
-    auto v = iotaVec(10);
+    auto v = iota_vec(10);
     auto b = v.cbegin();
     auto e = v.cend();
     CHECK(*b == 0);
@@ -173,7 +173,7 @@ TEST_CASE("vector.reserve")
 
 TEST_CASE("vector.clear_shrink_to_fit")
 {
-    auto v = iotaVec(10);
+    auto v = iota_vec(10);
     CHECK(v.capacity() == 10);
     CHECK(v.size() == 10);
     v.clear();
@@ -186,7 +186,7 @@ TEST_CASE("vector.clear_shrink_to_fit")
 
 TEST_CASE("vector.insert")
 {
-    auto v = iotaVec(2);
+    auto v = iota_vec(2);
     CHECK(*(v.insert(v.begin(), llama::One<RecordDim>{42})) == 42);
     CHECK(v.size() == 3);
     CHECK(v[0] == 42);
@@ -221,7 +221,7 @@ TEST_CASE("vector.push_back")
 
 TEST_CASE("vector.pop_back")
 {
-    auto v = iotaVec(2);
+    auto v = iota_vec(2);
     v.pop_back();
     CHECK(v.size() == 1);
     CHECK(v[0] == 0);
@@ -231,7 +231,7 @@ TEST_CASE("vector.pop_back")
 
 TEST_CASE("vector.resize")
 {
-    auto v = iotaVec(5);
+    auto v = iota_vec(5);
     v.resize(2);
     CHECK(v.size() == 2);
     CHECK(v[0] == 0);
@@ -260,7 +260,7 @@ TEST_CASE("vector.resize")
 
 TEST_CASE("vector.erase")
 {
-    auto v = iotaVec(4);
+    auto v = iota_vec(4);
     CHECK(*v.erase(v.begin()) == 1);
     CHECK(v.size() == 3);
     CHECK(v[0] == 1);

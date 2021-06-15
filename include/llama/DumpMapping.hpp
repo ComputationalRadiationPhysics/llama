@@ -59,7 +59,7 @@ namespace llama
         template <typename Mapping, typename ArrayDims, std::size_t... Coords>
         auto mappingBlobNrAndOffset(const Mapping& mapping, const ArrayDims& adCoord, RecordCoord<Coords...>)
         {
-            return mapping.template blobNrAndOffset<Coords...>(adCoord);
+            return mapping.template blob_nr_and_offset<Coords...>(adCoord);
         }
 
         inline auto color(const std::vector<std::size_t>& recordCoord) -> std::size_t
@@ -120,7 +120,7 @@ namespace llama
 
             std::vector<FieldBox<Mapping::ArrayDims::rank>> infos;
 
-            for (auto adCoord : ArrayDimsIndexRange{mapping.arrayDims()})
+            for (auto adCoord : ArrayDimsIndexRange{mapping.array_dims()})
             {
                 forEachLeaf<RecordDim>(
                     [&](auto coord)
@@ -173,10 +173,10 @@ namespace llama
 
         std::string svg;
 
-        std::array<int, Mapping::blobCount + 1> blobYOffset{};
-        for (auto i = 0; i < Mapping::blobCount; i++)
+        std::array<int, Mapping::blob_count + 1> blobYOffset{};
+        for (auto i = 0; i < Mapping::blob_count; i++)
         {
-            const auto blobRows = (mapping.blobSize(i) + wrapByteCount - 1) / wrapByteCount;
+            const auto blobRows = (mapping.blob_size(i) + wrapByteCount - 1) / wrapByteCount;
             blobYOffset[i + 1] = blobYOffset[i] + (blobRows + 1) * byteSizeInPixel; // one row gap between blobs
             const auto height = blobRows * byteSizeInPixel;
             svg += fmt::format(
