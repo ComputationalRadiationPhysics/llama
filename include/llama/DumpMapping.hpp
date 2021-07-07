@@ -4,6 +4,7 @@
 
 #include "ArrayDimsIndexRange.hpp"
 #include "Core.hpp"
+#include "mapping/OffsetTable.hpp"
 
 #include <boost/functional/hash.hpp>
 #include <fmt/format.h>
@@ -135,6 +136,25 @@ namespace llama
                     });
             }
 
+            return infos;
+        }
+
+        template <typename ArrayDims, typename RecordDim, typename SubMappings>
+        auto boxesFromMapping(const mapping::OffsetTable<ArrayDims, RecordDim, SubMappings>& mapping)
+            -> std::vector<FieldBox<ArrayDims::rank>>
+        {
+            std::size_t previousBlobs = 0;
+            std::vector<FieldBox<ArrayDims::rank>> infos;
+            boost::mp11::mp_for_each<boost::mp11::mp_iota<boost::mp11::mp_size<decltype(mapping.subMappings)>>>(
+                [&](auto ic)
+                {
+                    const auto& subMapping = get<decltype(ic)::value>(mapping.subMappings);
+                    auto subBoxes = boxesFromMapping(subMapping);
+                    for (auto& box : subBoxes)
+                        box.nrAndOffset.nr += previousBlobs;
+                    infos.insert(infos.end(), subBoxes.begin(), subBoxes.end());
+                    previousBlobs += std::decay_t<decltype(subMapping)>::blobCount;
+                });
             return infos;
         }
 

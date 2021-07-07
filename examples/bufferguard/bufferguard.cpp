@@ -69,8 +69,8 @@ struct GuardMapping2D
         std::abort();
     }
 
-    template <std::size_t... RecordCoords>
-    constexpr auto blobNrAndOffset(ArrayDims coord) const -> llama::NrAndOffset
+    template <std::size_t... RecordCoords, std::size_t N = 0>
+    constexpr auto blobNrAndOffset(ArrayDims coord, llama::Array<std::size_t, N> = {}) const -> llama::NrAndOffset
     {
         // [0][0] is at left top
         const auto [row, col] = coord;

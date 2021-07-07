@@ -4,6 +4,8 @@
 #include <atomic>
 #include <catch2/catch.hpp>
 #include <complex>
+#include <fstream>
+#include <llama/DumpMapping.hpp>
 #include <llama/llama.hpp>
 #include <vector>
 
@@ -266,4 +268,216 @@ TEST_CASE("recorddim.record_with_arrays")
     view(0u)(A3{}, 0_RC, 1_RC);
     view(0u)(A3{}, 1_RC, 0_RC);
     view(0u)(A3{}, 1_RC, 1_RC);
+}
+
+TEST_CASE("dynamic array")
+{
+    struct Tag
+    {
+    };
+    using RecordDim = llama::Record<llama::Field<Tag, int[]>>;
+    auto mapping
+        = llama::mapping::OffsetTable<llama::ArrayDims<1>, RecordDim>{llama::ArrayDims{2}, llama::ArrayDims{5}};
+    auto view = allocView(mapping);
+
+    view(0)(llama::EndOffset<Tag>{}) = 3;
+    view(1)(llama::EndOffset<Tag>{}) = 5;
+
+    CHECK(view(0)(llama::Size<Tag>{}) == 3);
+    int& e0 = view(0)(Tag{})(0);
+    int& e1 = view(0)(Tag{})(1);
+    int& e2 = view(0)(Tag{})(2);
+    CHECK(view(1)(llama::Size<Tag>{}) == 2);
+    int& e3 = view(1)(Tag{})(0);
+    int& e4 = view(1)(Tag{})(1);
+
+    e0 = 1;
+    e1 = 2;
+    e2 = 3;
+    e3 = 4;
+    e4 = 5;
+    CHECK(e0 == 1);
+    CHECK(e1 == 2);
+    CHECK(e2 == 3);
+    CHECK(e3 == 4);
+    CHECK(e4 == 5);
+}
+
+namespace
+{
+    // clang-format off
+    struct run {};
+    struct luminosityBlock {};
+    struct Electrons {};
+    struct Muons {};
+    struct Eta{};
+    struct Mass{};
+    struct Phi{};
+
+    using Electron = llama::Record<
+        llama::Field<Eta, float>,
+        llama::Field<Mass, float>,
+        llama::Field<Phi, float>
+    >;
+    using Muon = llama::Record<
+        llama::Field<Eta, float>,
+        llama::Field<Mass, float>,
+        llama::Field<Phi, float>
+    >;
+    using Event = llama::Record<
+        llama::Field<run, std::int32_t>,
+        llama::Field<luminosityBlock, std::int32_t>,
+        llama::Field<Electrons, Electron[]>,
+        llama::Field<Muons, Muon[]>
+    >;
+    // clang-format on
+} // namespace
+
+TEST_CASE("edm")
+{
+    // 3 events with 5 electrons and 4 muons
+    auto mapping = llama::mapping::OffsetTable<llama::ArrayDims<1>, Event>{
+        llama::ArrayDims{3},
+        llama::ArrayDims{5},
+        llama::ArrayDims{4}};
+    auto view = llama::allocView(mapping);
+
+    // setup offset table
+    view(0)(llama::EndOffset<Electrons>{}) = 3;
+    view(1)(llama::EndOffset<Electrons>{}) = 3;
+    view(2)(llama::EndOffset<Electrons>{}) = 5;
+
+    view(0)(llama::EndOffset<Muons>{}) = 0;
+    view(1)(llama::EndOffset<Muons>{}) = 3;
+    view(2)(llama::EndOffset<Muons>{}) = 4;
+
+    // fill with values
+    int value = 1;
+    for (auto i = 0; i < 3; i++)
+    {
+        auto event = view(i);
+        event(run{}) = value++;
+        event(luminosityBlock{}) = value++;
+        for (auto j = 0; j < event(llama::Size<Electrons>{}); j++)
+        {
+            auto electron = event(Electrons{})(j);
+            electron(Eta{}) = value++;
+            electron(Mass{}) = value++;
+            electron(Phi{}) = value++;
+        }
+        for (auto j = 0; j < event(llama::Size<Muons>{}); j++)
+        {
+            auto muon = event(Muons{})(j);
+            muon(Eta{}) = value++;
+            muon(Mass{}) = value++;
+            muon(Phi{}) = value++;
+        }
+    }
+
+    // check all values
+    value = 1;
+    CHECK(view(0)(run{}) == value++);
+    CHECK(view(0)(luminosityBlock{}) == value++);
+    CHECK(view(0)(llama::EndOffset<Electrons>{}) == 3);
+    CHECK(view(0)(llama::Size<Electrons>{}) == 3);
+    CHECK(view(0)(Electrons{})(0) (Eta{}) == value++);
+    CHECK(view(0)(Electrons{})(0) (Mass{}) == value++);
+    CHECK(view(0)(Electrons{})(0) (Phi{}) == value++);
+    CHECK(view(0)(Electrons{})(1) (Eta{}) == value++);
+    CHECK(view(0)(Electrons{})(1) (Mass{}) == value++);
+    CHECK(view(0)(Electrons{})(1) (Phi{}) == value++);
+    CHECK(view(0)(Electrons{})(2) (Eta{}) == value++);
+    CHECK(view(0)(Electrons{})(2) (Mass{}) == value++);
+    CHECK(view(0)(Electrons{})(2) (Phi{}) == value++);
+    CHECK(view(0)(llama::EndOffset<Muons>{}) == 0);
+    CHECK(view(0)(llama::Size<Muons>{}) == 0);
+
+    CHECK(view(1)(run{}) == value++);
+    CHECK(view(1)(luminosityBlock{}) == value++);
+    CHECK(view(1)(llama::EndOffset<Electrons>{}) == 3);
+    CHECK(view(1)(llama::Size<Electrons>{}) == 0);
+    CHECK(view(1)(llama::EndOffset<Muons>{}) == 3);
+    CHECK(view(1)(llama::Size<Muons>{}) == 3);
+    CHECK(view(1)(Muons{})(0) (Eta{}) == value++);
+    CHECK(view(1)(Muons{})(0) (Mass{}) == value++);
+    CHECK(view(1)(Muons{})(0) (Phi{}) == value++);
+    CHECK(view(1)(Muons{})(1) (Eta{}) == value++);
+    CHECK(view(1)(Muons{})(1) (Mass{}) == value++);
+    CHECK(view(1)(Muons{})(1) (Phi{}) == value++);
+    CHECK(view(1)(Muons{})(2) (Eta{}) == value++);
+    CHECK(view(1)(Muons{})(2) (Mass{}) == value++);
+    CHECK(view(1)(Muons{})(2) (Phi{}) == value++);
+
+    CHECK(view(2)(run{}) == value++);
+    CHECK(view(2)(luminosityBlock{}) == value++);
+    CHECK(view(2)(llama::EndOffset<Electrons>{}) == 5);
+    CHECK(view(2)(llama::Size<Electrons>{}) == 2);
+    CHECK(view(2)(Electrons{})(0) (Eta{}) == value++);
+    CHECK(view(2)(Electrons{})(0) (Mass{}) == value++);
+    CHECK(view(2)(Electrons{})(0) (Phi{}) == value++);
+    CHECK(view(2)(Electrons{})(1) (Eta{}) == value++);
+    CHECK(view(2)(Electrons{})(1) (Mass{}) == value++);
+    CHECK(view(2)(Electrons{})(1) (Phi{}) == value++);
+    CHECK(view(2)(llama::EndOffset<Muons>{}) == 4);
+    CHECK(view(2)(llama::Size<Muons>{}) == 1);
+    CHECK(view(2)(Muons{})(0) (Eta{}) == value++);
+    CHECK(view(2)(Muons{})(0) (Mass{}) == value++);
+    CHECK(view(2)(Muons{})(0) (Phi{}) == value++);
+}
+
+TEST_CASE("dump.edm.AlignedAoS")
+{
+    auto mapping = llama::mapping::OffsetTable<llama::ArrayDims<1>, Event>{
+        llama::ArrayDims{30},
+        llama::ArrayDims{50},
+        llama::ArrayDims{40}};
+    std::ofstream{"dump.edm.AlignedAoS.svg"} << llama::toSvg(mapping);
+    std::ofstream{"dump.edm.AlignedAoS.html"} << llama::toHtml(mapping);
+}
+
+TEST_CASE("dump.edm.MultiBlobSoA")
+{
+    auto mapping = llama::mapping::
+        OffsetTable<llama::ArrayDims<1>, Event, llama::mapping::MappingList<llama::mapping::PreconfiguredSoA<>::type>>{
+            llama::ArrayDims{30},
+            llama::ArrayDims{50},
+            llama::ArrayDims{40}};
+    std::ofstream{"dump.edm.MultiBlobSoA.svg"} << llama::toSvg(mapping);
+    std::ofstream{"dump.edm.MultiBlobSoA.html"} << llama::toHtml(mapping);
+}
+
+TEST_CASE("dump.edm.AlignedAoS_MultiBlobSoA")
+{
+    auto mapping = llama::mapping::OffsetTable<
+        llama::ArrayDims<1>,
+        Event,
+        llama::mapping::MappingList<
+            llama::mapping::PreconfiguredAoS<>::type,
+            llama::mapping::PreconfiguredSoA<>::type,
+            llama::mapping::PreconfiguredSoA<>::type>>{
+        llama::ArrayDims{30},
+        llama::ArrayDims{50},
+        llama::ArrayDims{40}};
+    std::ofstream{"dump.edm.AlignedAoS_MultiBlobSoA.svg"} << llama::toSvg(mapping);
+    std::ofstream{"dump.edm.AlignedAoS_MultiBlobSoA.html"} << llama::toHtml(mapping);
+}
+
+TEST_CASE("dump.edm.Split_AlignedAoS_MultiBlobSoA")
+{
+    auto mapping = llama::mapping::OffsetTable<
+        llama::ArrayDims<1>,
+        Event,
+        llama::mapping::MappingList<
+            llama::mapping::PreconfiguredSplit<
+                llama::RecordCoord<2>,
+                llama::mapping::PreconfiguredAoS<>::type,
+                llama::mapping::PreconfiguredAoS<>::type,
+                true>::type,
+            llama::mapping::PreconfiguredSoA<>::type,
+            llama::mapping::PreconfiguredSoA<>::type>>{
+        llama::ArrayDims{30},
+        llama::ArrayDims{50},
+        llama::ArrayDims{40}};
+    std::ofstream{"dump.edm.Split_AlignedAoS_MultiBlobSoA.svg"} << llama::toSvg(mapping);
+    std::ofstream{"dump.edm.Split_AlignedAoS_MultiBlobSoA.html"} << llama::toHtml(mapping);
 }
