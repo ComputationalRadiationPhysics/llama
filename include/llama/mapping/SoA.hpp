@@ -92,7 +92,7 @@ namespace llama::mapping
     template <typename ArrayDims, typename RecordDim, typename LinearizeArrayDimsFunctor = LinearizeArrayDimsCpp>
     using MultiBlobSoA = SoA<ArrayDims, RecordDim, true, LinearizeArrayDimsFunctor>;
 
-    template <bool SeparateBuffers = false, typename LinearizeArrayDimsFunctor = LinearizeArrayDimsCpp>
+    template <bool SeparateBuffers = true, typename LinearizeArrayDimsFunctor = LinearizeArrayDimsCpp>
     struct PreconfiguredSoA
     {
         template <typename ArrayDims, typename RecordDim>

@@ -80,7 +80,7 @@ namespace llama::mapping
     template <typename ArrayDims, typename RecordDim, typename LinearizeArrayDimsFunctor = LinearizeArrayDimsCpp>
     using PackedAoS = AoS<ArrayDims, RecordDim, false, LinearizeArrayDimsFunctor>;
 
-    template <bool AlignAndPad = false, typename LinearizeArrayDimsFunctor = LinearizeArrayDimsCpp>
+    template <bool AlignAndPad = true, typename LinearizeArrayDimsFunctor = LinearizeArrayDimsCpp>
     struct PreconfiguredAoS
     {
         template <typename ArrayDims, typename RecordDim>
