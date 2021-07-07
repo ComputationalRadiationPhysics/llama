@@ -3,8 +3,9 @@
 
 #pragma once
 
+#include "Meta.hpp"
+
 #include <array>
-#include <boost/mp11.hpp>
 #include <type_traits>
 
 namespace llama

@@ -35,6 +35,7 @@
 #include "BlobAllocators.hpp"
 #include "Copy.hpp"
 #include "Core.hpp"
+#include "Meta.hpp"
 #include "Vector.hpp"
 #include "View.hpp"
 #include "VirtualRecord.hpp"
