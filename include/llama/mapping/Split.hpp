@@ -103,8 +103,10 @@ namespace llama::mapping
                 return mapping1.blobSize(0) + mapping2.blobSize(0);
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(ArrayDims coord) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(
+            ArrayDims coord,
+            Array<std::size_t, N> dynamicArrayExtents = {}) const -> NrAndOffset
         {
             if constexpr (RecordCoordCommonPrefixIsSame<RecordCoordForMapping1, RecordCoord<RecordCoords...>>)
             {
@@ -112,13 +114,17 @@ namespace llama::mapping
                 // zero all coordinate values that are part of RecordCoordForMapping1
                 using Prefix = mp_repeat_c<mp_list_c<std::size_t, 0>, RecordCoordForMapping1::size>;
                 using Suffix = mp_drop_c<mp_list_c<std::size_t, RecordCoords...>, RecordCoordForMapping1::size>;
-                return blobNrAndOffset(RecordCoordFromList<mp_append<Prefix, Suffix>>{}, coord, mapping1);
+                return blobNrAndOffset(
+                    RecordCoordFromList<mp_append<Prefix, Suffix>>{},
+                    coord,
+                    dynamicArrayExtents,
+                    mapping1);
             }
             else
             {
                 constexpr auto dstCoord
                     = internal::offsetCoord(RecordCoord<RecordCoords...>{}, RecordCoordForMapping1{});
-                auto nrAndOffset = blobNrAndOffset(dstCoord, coord, mapping2);
+                auto nrAndOffset = blobNrAndOffset(dstCoord, coord, dynamicArrayExtents, mapping2);
                 if constexpr (SeparateBlobs)
                     nrAndOffset.nr += Mapping1::blobCount;
                 else
@@ -131,13 +137,14 @@ namespace llama::mapping
         }
 
     private:
-        template <std::size_t... RecordCoords, typename Mapping>
+        template <std::size_t... RecordCoords, std::size_t N, typename Mapping>
         LLAMA_FN_HOST_ACC_INLINE constexpr auto blobNrAndOffset(
             RecordCoord<RecordCoords...>,
             ArrayDims coord,
+            Array<std::size_t, N> dynamicArrayExtents,
             const Mapping& mapping) const -> NrAndOffset
         {
-            return mapping.template blobNrAndOffset<RecordCoords...>(coord);
+            return mapping.template blobNrAndOffset<RecordCoords...>(coord, dynamicArrayExtents);
         }
 
     public:

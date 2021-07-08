@@ -265,12 +265,12 @@ namespace llama
             if constexpr (isRecord<RecordDim> || internal::is_bounded_array<RecordDim>::value)
             {
                 LLAMA_FORCE_INLINE_RECURSIVE
-                return VirtualRecordTypeConst{arrayDims, *this};
+                return VirtualRecordTypeConst{*this, arrayDims};
             }
             else
             {
                 LLAMA_FORCE_INLINE_RECURSIVE
-                return accessor(arrayDims, RecordCoord<>{});
+                return accessor(arrayDims, Array<size_t, 0>{}, RecordCoord<>{});
             }
         }
 
@@ -279,12 +279,12 @@ namespace llama
             if constexpr (isRecord<RecordDim> || internal::is_bounded_array<RecordDim>::value)
             {
                 LLAMA_FORCE_INLINE_RECURSIVE
-                return VirtualRecordType{arrayDims, *this};
+                return VirtualRecordType{*this, arrayDims};
             }
             else
             {
                 LLAMA_FORCE_INLINE_RECURSIVE
-                return accessor(arrayDims, RecordCoord<>{});
+                return accessor(arrayDims, Array<size_t, 0>{}, RecordCoord<>{});
             }
         }
 
@@ -375,29 +375,34 @@ namespace llama
         friend struct VirtualRecord;
 
         LLAMA_SUPPRESS_HOST_DEVICE_WARNING
-        template <std::size_t... Coords>
-        LLAMA_FN_HOST_ACC_INLINE auto accessor(ArrayDims arrayDims, RecordCoord<Coords...> dc = {}) const
-            -> decltype(auto)
+        template <std::size_t N, std::size_t... Coords>
+        LLAMA_FN_HOST_ACC_INLINE auto accessor(
+            ArrayDims arrayDims,
+            Array<size_t, N> dynamicArrayExtents,
+            RecordCoord<Coords...> dc = {}) const -> decltype(auto)
         {
             if constexpr (isComputed<Mapping, RecordCoord<Coords...>>)
                 return mapping.compute(arrayDims, dc, storageBlobs);
             else
             {
-                const auto [nr, offset] = mapping.template blobNrAndOffset<Coords...>(arrayDims);
+                const auto [nr, offset] = mapping.template blobNrAndOffset<Coords...>(arrayDims, dynamicArrayExtents);
                 using Type = GetType<RecordDim, RecordCoord<Coords...>>;
                 return reinterpret_cast<const Type&>(storageBlobs[nr][offset]);
             }
         }
 
         LLAMA_SUPPRESS_HOST_DEVICE_WARNING
-        template <std::size_t... Coords>
-        LLAMA_FN_HOST_ACC_INLINE auto accessor(ArrayDims arrayDims, RecordCoord<Coords...> dc = {}) -> decltype(auto)
+        template <std::size_t N, std::size_t... Coords>
+        LLAMA_FN_HOST_ACC_INLINE auto accessor(
+            ArrayDims arrayDims,
+            Array<size_t, N> dynamicArrayExtents,
+            RecordCoord<Coords...> dc = {}) -> decltype(auto)
         {
             if constexpr (isComputed<Mapping, RecordCoord<Coords...>>)
-                return mapping.compute(arrayDims, dc, storageBlobs);
+                return mapping.compute(arrayDims, dynamicArrayExtents, dc, storageBlobs);
             else
             {
-                const auto [nr, offset] = mapping.template blobNrAndOffset<Coords...>(arrayDims);
+                const auto [nr, offset] = mapping.template blobNrAndOffset<Coords...>(arrayDims, dynamicArrayExtents);
                 using Type = GetType<RecordDim, RecordCoord<Coords...>>;
                 return reinterpret_cast<Type&>(storageBlobs[nr][offset]);
             }
