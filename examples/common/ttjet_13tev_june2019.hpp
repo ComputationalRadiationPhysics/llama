@@ -7,7 +7,7 @@
 
 using bit = bool;
 using byte = unsigned char;
-using Index = std::uint64_t;
+using Index = std::uint32_t;
 
 // clang-format off
 struct run {};
@@ -1538,7 +1538,7 @@ using Electron = llama::Record<
     llama::Field<Electron_pdgId, std::int32_t>,
     llama::Field<Electron_photonIdx, std::int32_t>,
     llama::Field<Electron_tightCharge, std::int32_t>,
-    llama::Field<Electron_vidNestedWPbitmap, std::int32_t>,
+    //llama::Field<Electron_vidNestedWPbitmap, std::int32_t>,
     llama::Field<Electron_convVeto, bit>,
     llama::Field<Electron_cutBased_HEEP, bit>,
     llama::Field<Electron_isPFcand, bit>,
@@ -1947,6 +1947,7 @@ using Event = llama::Record<
     llama::Field<ChsMET_sumEt, float>,
     //llama::Field<nCorrT1METJet, Index>,
     //llama::Field<nElectron, Index>,
+    llama::Field<nElectron, Electron[]>,
     llama::Field<Flag_ecalBadCalibFilterV2, bit>,
     //llama::Field<nFatJet, Index>,
     //llama::Field<nGenJetAK8, Index>,
