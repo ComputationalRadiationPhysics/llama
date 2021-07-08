@@ -44,8 +44,8 @@ namespace llama::mapping
             return mapping.blobSize(i);
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE auto blobNrAndOffset(ArrayDims coord) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE auto blobNrAndOffset(ArrayDims coord, Array<std::size_t, N> = {}) const -> NrAndOffset
         {
             const auto nao = mapping.template blobNrAndOffset<RecordCoords...>(coord);
             for (auto i = 0; i < sizeof(GetType<RecordDim, RecordCoord<RecordCoords...>>); i++)

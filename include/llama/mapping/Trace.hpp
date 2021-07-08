@@ -75,8 +75,9 @@ namespace llama::mapping
             return mapping.blobSize(i);
         }
 
-        template <std::size_t... RecordCoords>
-        LLAMA_FN_HOST_ACC_INLINE auto blobNrAndOffset(ArrayDims coord) const -> NrAndOffset
+        template <std::size_t... RecordCoords, std::size_t N = 0>
+        LLAMA_FN_HOST_ACC_INLINE auto blobNrAndOffset(ArrayDims coord, Array<std::size_t, N> dynamicArrayExtents = {})
+            const -> NrAndOffset
         {
             const static auto name = internal::coordName<RecordDim>(RecordCoord<RecordCoords...>{});
             fieldHits.at(name)++;
