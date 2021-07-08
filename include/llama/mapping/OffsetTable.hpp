@@ -277,6 +277,11 @@ namespace llama::mapping
                 return reinterpret_cast<const EndOffsetType&>(
                     *mapToAddress<MappingIndex>(ResolvedRecordCoord{}, unresolvedBeforeDynamic, prevCoord, blobs));
             };
+            auto loadEndOffset = [&](auto unresolvedBeforeDynamic) -> EndOffsetType
+            {
+                return reinterpret_cast<const EndOffsetType&>(
+                    *mapToAddress<MappingIndex>(ResolvedRecordCoord{}, unresolvedBeforeDynamic, coord, blobs));
+            };
 
             using Tag = GetTag<RecordDim, ResolvedSoFar>;
             if constexpr (internal::isEndOffsetField<Tag>)
@@ -290,11 +295,7 @@ namespace llama::mapping
             {
                 // compute size from end offset and prev end offset (or 0 for the first sub array)
                 const auto begin = loadBeginOffset(internal::OffsetLastCoord<UnresolvedBeforeDynamic, -2>{});
-                const auto end = reinterpret_cast<const EndOffsetType&>(*mapToAddress<MappingIndex>(
-                    ResolvedRecordCoord{},
-                    internal::OffsetLastCoord<UnresolvedBeforeDynamic, -2>{},
-                    coord,
-                    blobs));
+                const auto end = loadEndOffset(internal::OffsetLastCoord<UnresolvedBeforeDynamic, -2>{});
                 return static_cast<SizeType>(end - begin);
             }
             else if constexpr (std::is_same_v<UnresolvedBeforeDynamic, UnresolvedRecordCoord>)
@@ -312,6 +313,7 @@ namespace llama::mapping
                 constexpr auto nextSubMappingIndex = boost::mp11::mp_find<SplitCoords, ShiftedCoord>::value + 1;
                 static_assert(nextSubMappingIndex < boost::mp11::mp_size<MappedSubRecordDims>::value);
                 const auto dynamicSubIndex = loadBeginOffset(UnresolvedBeforeDynamic{}) + dynamicArrayExtents[0];
+                assert((dynamicSubIndex < loadEndOffset(UnresolvedBeforeDynamic{})) && "Dynamic index out of range");
                 return computeRecursive<nextSubMappingIndex>(
                     Cat<ResolvedSoFar, RecordCoord<dynamic>>{},
                     UnresolvedAfterDynamic{},
